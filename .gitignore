@@ -1,0 +1,28 @@
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Dependencies & build
+node_modules/
+dist/
+build/
+
+# Upload temp
+tmp/
+backend/tmp/
+
+# Test output
+coverage/
+playwright-report/
+test-results/
+
+# OS & tools
+.DS_Store
+.tools/
+.codex/config.toml
+
+# Binary / generated
+*.docx
+*.xlsx
+

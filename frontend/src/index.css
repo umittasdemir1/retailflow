@@ -1,0 +1,568 @@
+:root {
+  color-scheme: light;
+  font-family: 'Space Grotesk', 'IBM Plex Sans', 'Segoe UI', sans-serif;
+  --ink: #14213d;
+  --ink-soft: #3f5378;
+  --paper: rgba(255, 253, 247, 0.82);
+  --line: rgba(20, 33, 61, 0.1);
+  --accent: #d97706;
+  --accent-soft: #f59e0b;
+  --aqua: #0f766e;
+  --berry: #9f1239;
+  --sky: #2563eb;
+  --shadow: 0 24px 80px rgba(20, 33, 61, 0.12);
+  background:
+    radial-gradient(circle at top left, rgba(245, 158, 11, 0.18), transparent 28%),
+    radial-gradient(circle at top right, rgba(37, 99, 235, 0.16), transparent 24%),
+    linear-gradient(180deg, #fbf5ea 0%, #eaf2f8 100%);
+  color: var(--ink);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+.rf-shell {
+  max-width: 1520px;
+  margin: 0 auto;
+  padding: 32px 20px 72px;
+}
+
+.rf-hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: flex-start;
+  padding: 8px 0 28px;
+}
+
+.rf-eyebrow {
+  margin: 0 0 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  font-size: 0.74rem;
+  color: var(--accent);
+}
+
+.rf-hero h1 {
+  margin: 0;
+  font-size: clamp(2.4rem, 5vw, 4.8rem);
+  line-height: 0.96;
+  max-width: 12ch;
+}
+
+.rf-lede {
+  max-width: 62ch;
+  margin: 18px 0 0;
+  color: var(--ink-soft);
+  line-height: 1.65;
+  font-size: 1rem;
+}
+
+.rf-hero-meta {
+  min-width: 260px;
+  display: grid;
+  gap: 14px;
+  justify-items: end;
+}
+
+.rf-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.rf-chip,
+.rf-status-badge {
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.64);
+  backdrop-filter: blur(10px);
+  padding: 10px 14px;
+  font-size: 0.84rem;
+}
+
+.rf-status-badge {
+  font-weight: 700;
+}
+
+.rf-status-badge.is-healthy {
+  background: rgba(15, 118, 110, 0.12);
+  color: var(--aqua);
+  border-color: rgba(15, 118, 110, 0.25);
+}
+
+.rf-toast {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 22px;
+  padding: 14px 18px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.7);
+  box-shadow: var(--shadow);
+}
+
+.rf-toast button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+}
+
+.rf-toast.is-success {
+  color: var(--aqua);
+}
+
+.rf-toast.is-error {
+  color: var(--berry);
+}
+
+.rf-overview-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 24px;
+}
+
+.rf-stat-card {
+  display: grid;
+  gap: 10px;
+  min-height: 146px;
+  padding: 20px;
+  border-radius: 24px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(10px);
+}
+
+.rf-stat-card span {
+  color: var(--ink-soft);
+  font-size: 0.86rem;
+}
+
+.rf-stat-card strong {
+  font-size: clamp(1.5rem, 4vw, 2.3rem);
+  line-height: 1;
+}
+
+.rf-stat-card small {
+  color: var(--ink-soft);
+  line-height: 1.45;
+}
+
+.rf-stat-card.is-warm {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.18), rgba(255, 255, 255, 0.86));
+}
+
+.rf-stat-card.is-cool {
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.16), rgba(255, 255, 255, 0.86));
+}
+
+.rf-stat-card.is-bright {
+  background: linear-gradient(135deg, rgba(15, 118, 110, 0.18), rgba(255, 255, 255, 0.86));
+}
+
+.rf-stat-card.is-deep {
+  background: linear-gradient(135deg, rgba(159, 18, 57, 0.14), rgba(255, 255, 255, 0.86));
+}
+
+.rf-main-grid,
+.rf-results-grid {
+  display: grid;
+  gap: 24px;
+}
+
+.rf-main-grid {
+  grid-template-columns: minmax(0, 1.35fr) minmax(340px, 0.9fr);
+  margin-bottom: 24px;
+}
+
+.rf-results-grid {
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 0.9fr);
+}
+
+.rf-column,
+.rf-panel-stack {
+  display: grid;
+  gap: 24px;
+}
+
+.rf-panel {
+  border-radius: 28px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(12px);
+  padding: 22px;
+}
+
+.rf-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.rf-panel-header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.rf-panel-header p {
+  margin: 8px 0 0;
+  color: var(--ink-soft);
+  line-height: 1.5;
+}
+
+.rf-upload-zone {
+  border: 1.5px dashed rgba(217, 119, 6, 0.38);
+  border-radius: 26px;
+  padding: 28px;
+  display: grid;
+  gap: 18px;
+  min-height: 240px;
+  align-content: center;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.85), rgba(249, 242, 225, 0.95)),
+    radial-gradient(circle at top right, rgba(245, 158, 11, 0.18), transparent 28%);
+}
+
+.rf-upload-zone.is-dragging {
+  border-color: var(--sky);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.95), rgba(232, 244, 255, 0.95)),
+    radial-gradient(circle at top right, rgba(37, 99, 235, 0.2), transparent 28%);
+}
+
+.rf-upload-zone p,
+.rf-upload-zone strong {
+  margin: 0;
+}
+
+.rf-upload-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  padding: 12px 18px;
+  border-radius: 14px;
+  background: var(--ink);
+  color: white;
+  font-weight: 700;
+}
+
+.rf-upload-button input {
+  display: none;
+}
+
+.rf-upload-meta {
+  display: grid;
+  gap: 4px;
+  color: var(--ink-soft);
+}
+
+.rf-health-strip,
+.rf-simulation-panel,
+.rf-strategy-detail {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+}
+
+.rf-health-strip > div,
+.rf-simulation-panel > div,
+.rf-strategy-detail > div {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(20, 33, 61, 0.08);
+}
+
+.rf-health-strip span,
+.rf-simulation-panel span,
+.rf-strategy-detail span {
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+}
+
+.rf-health-strip strong,
+.rf-simulation-panel strong,
+.rf-strategy-detail strong {
+  font-size: 1.05rem;
+}
+
+.rf-leaderboard {
+  display: grid;
+  gap: 10px;
+}
+
+.rf-leader-card {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 14px;
+  align-items: center;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.62);
+  border: 1px solid rgba(20, 33, 61, 0.08);
+}
+
+.rf-leader-card span,
+.rf-leader-card small {
+  color: var(--ink-soft);
+}
+
+.rf-leader-card strong,
+.rf-leader-card b {
+  font-size: 1rem;
+}
+
+.rf-strategy-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.rf-strategy-card,
+.rf-mode-button,
+.rf-primary-button,
+.rf-secondary-button,
+.rf-check-item {
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease, background 180ms ease;
+}
+
+.rf-strategy-card {
+  text-align: left;
+  border: 1px solid rgba(20, 33, 61, 0.1);
+  background: rgba(255, 255, 255, 0.72);
+  border-radius: 20px;
+  padding: 16px;
+  display: grid;
+  gap: 10px;
+}
+
+.rf-strategy-card.is-active {
+  border-color: rgba(217, 119, 6, 0.45);
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.16), rgba(255, 255, 255, 0.9));
+  transform: translateY(-1px);
+}
+
+.rf-strategy-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.rf-strategy-card p,
+.rf-strategy-card small {
+  margin: 0;
+  color: var(--ink-soft);
+}
+
+.rf-mode-row {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.rf-mode-button,
+.rf-primary-button,
+.rf-secondary-button {
+  border: 1px solid rgba(20, 33, 61, 0.12);
+  border-radius: 16px;
+  min-height: 50px;
+  padding: 0 16px;
+}
+
+.rf-mode-button {
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.rf-mode-button.is-active {
+  background: var(--ink);
+  color: white;
+}
+
+.rf-primary-button {
+  background: var(--ink);
+  color: white;
+}
+
+.rf-secondary-button {
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--ink);
+}
+
+.rf-primary-button:disabled,
+.rf-secondary-button:disabled,
+.rf-mode-button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.rf-field {
+  display: grid;
+  gap: 10px;
+}
+
+.rf-field span {
+  font-size: 0.86rem;
+  color: var(--ink-soft);
+}
+
+.rf-field select {
+  width: 100%;
+  min-height: 52px;
+  border-radius: 16px;
+  border: 1px solid rgba(20, 33, 61, 0.12);
+  background: white;
+  padding: 0 14px;
+}
+
+.rf-check-list {
+  display: grid;
+  gap: 10px;
+  max-height: 220px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.rf-check-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid rgba(20, 33, 61, 0.08);
+  background: rgba(255, 255, 255, 0.64);
+  border-radius: 16px;
+  padding: 12px 14px;
+}
+
+.rf-check-item small {
+  color: var(--ink-soft);
+}
+
+.rf-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.rf-summary-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.rf-inline-note,
+.rf-empty-inline {
+  margin: 0;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.58);
+  color: var(--ink-soft);
+}
+
+.rf-table-wrap {
+  overflow: auto;
+  border-radius: 20px;
+  border: 1px solid rgba(20, 33, 61, 0.08);
+}
+
+.rf-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 640px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.rf-table th,
+.rf-table td {
+  padding: 14px 16px;
+  text-align: left;
+  border-bottom: 1px solid rgba(20, 33, 61, 0.08);
+  vertical-align: top;
+}
+
+.rf-table th {
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  background: rgba(20, 33, 61, 0.04);
+}
+
+.rf-table td strong,
+.rf-table td small {
+  display: block;
+}
+
+.rf-table td small {
+  margin-top: 4px;
+  color: var(--ink-soft);
+}
+
+@media (max-width: 1180px) {
+  .rf-overview-grid,
+  .rf-results-grid,
+  .rf-main-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .rf-hero {
+    flex-direction: column;
+  }
+
+  .rf-hero-meta {
+    justify-items: start;
+  }
+
+  .rf-chip-row {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 720px) {
+  .rf-shell {
+    padding: 22px 14px 48px;
+  }
+
+  .rf-overview-grid,
+  .rf-summary-grid,
+  .rf-mode-row {
+    grid-template-columns: 1fr;
+  }
+
+  .rf-panel {
+    padding: 18px;
+    border-radius: 22px;
+  }
+
+  .rf-upload-zone {
+    padding: 20px;
+  }
+}

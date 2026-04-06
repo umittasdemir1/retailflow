@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: retailflow-api
+    runtime: node
+    buildCommand: npm ci && npm run build --workspace @retailflow/shared && npm run build --workspace backend
+    startCommand: cd backend && npm start
+    envVars:
+      - key: PORT
+        value: 8787
+      - key: CORS_ORIGIN
+        sync: false
+      - key: NODE_ENV
+        value: production
+
+  - type: static
+    name: retailflow-frontend
+    buildCommand: cd frontend && npm ci && npm run build
+    staticPublishPath: frontend/dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_BASE_URL
+        sync: false

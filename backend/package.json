@@ -1,0 +1,35 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.22.2 <23"
+  },
+  "scripts": {
+    "dev": "../node_modules/.bin/tsx watch src/index.ts",
+    "build": "../node_modules/.bin/tsc -p tsconfig.json",
+    "start": "node dist/src/index.js",
+    "pretest": "npm run build --workspace @retailflow/shared",
+    "test": "../node_modules/.bin/vitest run",
+    "test:watch": "../node_modules/.bin/vitest"
+  },
+  "dependencies": {
+    "@retailflow/shared": "file:../shared",
+    "cors": "^2.8.5",
+    "dotenv": "17.4.1",
+    "exceljs": "^4.4.0",
+    "express": "5.2.1",
+    "multer": "2.1.1",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.1",
+    "@types/multer": "2.1.0",
+    "@types/node": "25.5.2",
+    "tsx": "^4.19.3",
+    "typescript": "6.0.2",
+    "vitest": "4.1.2"
+  }
+}
