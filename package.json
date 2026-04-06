@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "engines": {
-    "node": ">=22.22.2 <23"
+    "node": ">=20"
   },
   "workspaces": [
     "shared",
