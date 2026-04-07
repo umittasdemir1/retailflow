@@ -1,4 +1,4 @@
-import type { InventoryRecord } from './types';
+import type { InventoryRecord } from './types.js';
 
 export function toText(value: unknown): string {
   if (value == null) {

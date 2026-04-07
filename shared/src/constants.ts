@@ -1,4 +1,4 @@
-import type { RetailFlowStrategy, StrategyConfig } from './types';
+import type { RetailFlowStrategy, StrategyConfig } from './types.js';
 
 export const STRATEGY_CONFIGS: Record<RetailFlowStrategy, StrategyConfig> = {
   sakin: {
