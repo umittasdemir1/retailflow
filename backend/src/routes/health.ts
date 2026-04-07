@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { STRATEGY_CONFIGS } from '@retailflow/shared';
-import { sessionStore } from '../store/sessionStore';
-import { getMemoryUsagePercent } from '../utils/system';
+import { sessionStore } from '../store/sessionStore.js';
+import { getMemoryUsagePercent } from '../utils/system.js';
 
 export const healthRouter = Router();
 

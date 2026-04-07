@@ -1,8 +1,8 @@
 import type { AnalysisResult } from '@retailflow/shared';
 import { Router } from 'express';
-import { runAnalysis } from '../usecases/runAnalysis';
-import { validateAnalyzeRequest } from '../utils/validators';
-import { getMemoryUsagePercent } from '../utils/system';
+import { runAnalysis } from '../usecases/runAnalysis.js';
+import { validateAnalyzeRequest } from '../utils/validators.js';
+import { getMemoryUsagePercent } from '../utils/system.js';
 
 export const analyzeRouter = Router();
 

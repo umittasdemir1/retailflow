@@ -1,8 +1,8 @@
 import fs from 'node:fs';
 import type { UploadResult } from '@retailflow/shared';
-import { parseExcelFile } from '../services/excelParser';
-import { computeStoreMetrics } from '../services/storeMetrics';
-import { sessionStore } from '../store/sessionStore';
+import { parseExcelFile } from '../services/excelParser.js';
+import { computeStoreMetrics } from '../services/storeMetrics.js';
+import { sessionStore } from '../store/sessionStore.js';
 
 export function processUpload(filePath: string, originalName: string): UploadResult {
   try {

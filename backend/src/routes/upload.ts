@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type multer from 'multer';
-import { processUpload } from '../usecases/processUpload';
+import { processUpload } from '../usecases/processUpload.js';
 
 export function uploadRouter(upload: multer.Multer): Router {
   const router = Router();

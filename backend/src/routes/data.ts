@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { sessionStore } from '../store/sessionStore';
+import { sessionStore } from '../store/sessionStore.js';
 
 export const dataRouter = Router();
 

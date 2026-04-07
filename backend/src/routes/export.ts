@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { exportAnalysis } from '../usecases/exportAnalysis';
-import { validateExportRequest } from '../utils/validators';
+import { exportAnalysis } from '../usecases/exportAnalysis.js';
+import { validateExportRequest } from '../utils/validators.js';
 
 export const exportRouter = Router();
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { runTransferAnalysis, simulateTransferImpact } from '../src/services/transferEngine';
+import { runTransferAnalysis, simulateTransferImpact } from '../src/services/transferEngine.js';
 import type { AnalyzeRequest, InventoryRecord } from '@retailflow/shared';
 
 function buildRequest(overrides: Partial<AnalyzeRequest> = {}): AnalyzeRequest {

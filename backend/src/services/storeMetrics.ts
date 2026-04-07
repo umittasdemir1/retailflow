@@ -1,5 +1,5 @@
 import { DEFAULT_PRIORITY_SOURCES, type InventoryRecord, type StoreMetrics } from '@retailflow/shared';
-import { computeCoverDays, computeSalesVelocity, computeStr } from './strCalculator';
+import { computeCoverDays, computeSalesVelocity, computeStr } from './strCalculator.js';
 
 export function computeStoreMetrics(records: InventoryRecord[], prioritySources = DEFAULT_PRIORITY_SOURCES): StoreMetrics[] {
   const grouped = new Map<string, { totalSales: number; totalInventory: number; products: Set<string> }>();

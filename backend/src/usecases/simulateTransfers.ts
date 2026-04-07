@@ -1,5 +1,5 @@
 import type { TransferSimulation } from '@retailflow/shared';
-import { sessionStore } from '../store/sessionStore';
+import { sessionStore } from '../store/sessionStore.js';
 
 export function simulateTransfers(): TransferSimulation {
   const analysis = sessionStore.get().currentAnalysis;

@@ -1,7 +1,7 @@
 import type { ExportRequest } from '@retailflow/shared';
-import { buildExcelReport } from '../services/excelExporter';
-import { runAnalysis } from './runAnalysis';
-import { sessionStore } from '../store/sessionStore';
+import { buildExcelReport } from '../services/excelExporter.js';
+import { runAnalysis } from './runAnalysis.js';
+import { sessionStore } from '../store/sessionStore.js';
 
 export async function exportAnalysis(request: ExportRequest): Promise<Buffer> {
   const current = sessionStore.get().currentAnalysis;

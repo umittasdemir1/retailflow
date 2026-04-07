@@ -1,15 +1,15 @@
 import cors from 'cors';
 import express from 'express';
 import multer from 'multer';
-import { appConfig } from './config';
-import { analyzeRouter } from './routes/analyze';
-import { dataRouter } from './routes/data';
-import { exportRouter } from './routes/export';
-import { healthRouter } from './routes/health';
-import { simulateRouter } from './routes/simulate';
-import { storesRouter } from './routes/stores';
-import { strategiesRouter } from './routes/strategies';
-import { uploadRouter } from './routes/upload';
+import { appConfig } from './config.js';
+import { analyzeRouter } from './routes/analyze.js';
+import { dataRouter } from './routes/data.js';
+import { exportRouter } from './routes/export.js';
+import { healthRouter } from './routes/health.js';
+import { simulateRouter } from './routes/simulate.js';
+import { storesRouter } from './routes/stores.js';
+import { strategiesRouter } from './routes/strategies.js';
+import { uploadRouter } from './routes/upload.js';
 
 const app = express();
 const upload = multer({

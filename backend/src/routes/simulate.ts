@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { simulateTransfers } from '../usecases/simulateTransfers';
+import { simulateTransfers } from '../usecases/simulateTransfers.js';
 
 export const simulateRouter = Router();
 

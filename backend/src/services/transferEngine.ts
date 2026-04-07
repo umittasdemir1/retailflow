@@ -10,7 +10,7 @@ import {
   type TransferSuggestion,
 } from '@retailflow/shared';
 import { resolveProductIdentity } from '@retailflow/shared';
-import { checkTransferConditions, computeStr, computeStrBasedTransfer } from './strCalculator';
+import { checkTransferConditions, computeStr, computeStrBasedTransfer } from './strCalculator.js';
 
 interface StoreProductAggregate extends InventoryRecord {
   productKey: string;

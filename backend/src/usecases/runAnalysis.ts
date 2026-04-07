@@ -1,6 +1,6 @@
 import type { AnalysisResult, AnalyzeRequest } from '@retailflow/shared';
-import { runTransferAnalysis } from '../services/transferEngine';
-import { sessionStore } from '../store/sessionStore';
+import { runTransferAnalysis } from '../services/transferEngine.js';
+import { sessionStore } from '../store/sessionStore.js';
 
 export function runAnalysis(request: AnalyzeRequest): AnalysisResult {
   const state = sessionStore.get();
