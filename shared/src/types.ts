@@ -126,6 +126,8 @@ export interface UploadResult {
   fileName: string;
   rowCount: number;
   storeCount: number;
+  uniqueProductCount: number;
+  uniqueColorCount: number;
   stores: string[];
   columns: string[];
 }

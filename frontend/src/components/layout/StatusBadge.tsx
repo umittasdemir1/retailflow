@@ -1,16 +1,20 @@
 type StatusBadgeState = 'healthy' | 'loading' | 'offline';
 
-export function StatusBadge(props: { state: StatusBadgeState }) {
-  const label =
-    props.state === 'healthy'
-      ? 'API hazır'
-      : props.state === 'loading'
-        ? 'API kontrol ediliyor'
-        : 'API erişilemiyor';
+const STATUS_LABEL: Record<StatusBadgeState, string> = {
+  healthy: 'API hazır',
+  loading: 'API kontrol ediliyor',
+  offline: 'API erişilemiyor',
+};
 
+export function StatusBadge(props: { state: StatusBadgeState }) {
   return (
-    <div className={`rf-status-badge is-${props.state}`} role="status" aria-label={label} title={label}>
-      <span className="rf-sr-only">{label}</span>
+    <div
+      className={`rf-status-badge is-${props.state}`}
+      role="status"
+      aria-label={STATUS_LABEL[props.state]}
+      title={STATUS_LABEL[props.state]}
+    >
+      <span className="rf-sr-only">{STATUS_LABEL[props.state]}</span>
     </div>
   );
 }

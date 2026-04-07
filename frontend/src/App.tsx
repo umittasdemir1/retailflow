@@ -12,7 +12,6 @@ import { ToastBanner, type ToastState } from './components/ui/Toast';
 import { StatusBadge } from './components/layout/StatusBadge';
 import { OverviewCards } from './components/dashboard/OverviewCards';
 import { UploadZone } from './components/upload/UploadZone';
-import { HealthStrip } from './components/dashboard/HealthStrip';
 import { StoreLeaderboard } from './components/dashboard/StoreLeaderboard';
 import { StrChart } from './components/dashboard/StrChart';
 import { StoreMetricsTable } from './components/dashboard/StoreMetricsTable';
@@ -22,7 +21,6 @@ import { StoreSelector } from './components/analysis/StoreSelector';
 import { SummaryPanel } from './components/results/SummaryPanel';
 import { SimulationPanel } from './components/results/SimulationPanel';
 import { TransferTable } from './components/results/TransferTable';
-import { RejectedTable } from './components/results/RejectedTable';
 
 import { normalizeError, buildClientFileName, downloadBlob } from './lib/utils';
 import type { AnalyzeResponse } from './lib/api';
@@ -170,7 +168,6 @@ export default function App() {
 
           <Panel title="2. Operasyon panosu" subtitle="Yüklenen verinin genel resmini ve mağaza dağılımını incele.">
             <div className="rf-panel-stack">
-              <HealthStrip health={health} />
               <StoreLeaderboard stores={topStores.slice(0, 5)} />
               <StrChart stores={stores} />
               <StoreMetricsTable stores={stores} isLoading={storesQuery.isLoading} />
@@ -217,20 +214,12 @@ export default function App() {
         </div>
       </section>
 
-      <section className="rf-results-grid">
-        <Panel
-          title="Transfer önerileri"
-          subtitle={analysis ? 'Toplam: ' + analysis.totalTransferCount + ' · ' + analysis.transfers.length + ' satır gösteriliyor' : 'Analiz sonuçları burada listelenecek.'}
-        >
-          <TransferTable rows={analysis?.transfers ?? []} />
-        </Panel>
-        <Panel
-          title="Reddedilenler"
-          subtitle={analysis ? analysis.rejectedTransfers.length + ' red kaydı' : 'Koşulları sağlamayan ürünler analiz sonrasında burada görünür.'}
-        >
-          <RejectedTable rows={analysis?.rejectedTransfers ?? []} />
-        </Panel>
-      </section>
+      <Panel
+        title="Transfer önerileri"
+        subtitle={analysis ? 'Toplam: ' + analysis.totalTransferCount + ' · ' + analysis.transfers.length + ' satır gösteriliyor' : 'Analiz sonuçları burada listelenecek.'}
+      >
+        <TransferTable rows={analysis?.transfers ?? []} />
+      </Panel>
     </main>
   );
 }

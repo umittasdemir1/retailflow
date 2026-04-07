@@ -9,11 +9,16 @@ export function processUpload(filePath: string, originalName: string): UploadRes
   try {
     const parsed = parseExcelFile(filePath);
     const metrics = computeStoreMetrics(parsed.records);
+    const uniqueProductCount = new Set(parsed.records.map((r) => r.productCode || r.productName)).size;
+    const uniqueColorCount = new Set(parsed.records.map((r) => r.color)).size;
+
     const result: UploadResult = {
       success: true,
       fileName: normalizeUploadedFileName(originalName),
       rowCount: parsed.records.length,
       storeCount: parsed.stores.length,
+      uniqueProductCount,
+      uniqueColorCount,
       stores: parsed.stores,
       columns: parsed.columns,
     };

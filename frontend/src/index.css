@@ -1,53 +1,84 @@
+/* ================================================================
+   RETAILFLOW — CLEAN MINIMAL
+   Typography : Urbanist · DM Mono
+   ================================================================ */
+
 :root {
   color-scheme: light;
-  font-family: 'IBM Plex Sans', 'Space Grotesk', 'Segoe UI', sans-serif;
-  --ink: #111827;
-  --ink-soft: #5f6b7a;
-  --ink-muted: #8b95a7;
-  --paper: #ffffff;
-  --paper-soft: #f8fafc;
-  --paper-muted: #f3f4f6;
-  --line: #e5e7eb;
-  --line-strong: #d1d5db;
-  --accent: #111827;
-  --aqua: #0f766e;
-  --berry: #b91c1c;
-  --sky: #1d4ed8;
-  --shadow-soft: 0 10px 30px rgba(15, 23, 42, 0.05);
-  --shadow-card: 0 16px 40px rgba(15, 23, 42, 0.06);
-  background: #ffffff;
+
+  /* Backgrounds */
+  --bg:           #ffffff;
+  --surface:      #f7f8fb;
+  --surface-up:   #f0f2f7;
+
+  /* Borders */
+  --line:         #e3e7ef;
+  --line-strong:  #c9d0de;
+
+  /* Text */
+  --ink:          #0f1923;
+  --ink-soft:     #4e5b6e;
+  --ink-muted:    #8d9aab;
+
+  /* Accent — deep blue */
+  --accent:       #1d4ed8;
+  --accent-soft:  rgba(29, 78, 216, 0.08);
+  --accent-text:  #1d4ed8;
+
+  /* Semantic */
+  --green:        #059669;
+  --red:          #dc2626;
+  --amber:        #d97706;
+
+  /* Legacy aliases used throughout components */
+  --paper:        var(--bg);
+  --paper-soft:   var(--surface);
+  --paper-muted:  var(--surface-up);
+  --line-strong:  var(--line-strong);
+  --aqua:         var(--green);
+  --berry:        var(--red);
+  --sky:          var(--accent);
+
+  /* Shadows */
+  --shadow-soft:  0 1px 4px rgba(15, 25, 40, 0.06), 0 4px 16px rgba(15, 25, 40, 0.05);
+  --shadow-card:  0 2px 8px rgba(15, 25, 40, 0.08), 0 8px 24px rgba(15, 25, 40, 0.06);
+
+  background: var(--bg);
   color: var(--ink);
+  font-family: 'Urbanist', system-ui, sans-serif;
 }
+
+/* ================================================================
+   RESET & BASE
+   ================================================================ */
 
 * {
   box-sizing: border-box;
 }
 
-html,
-body,
-#root {
+html, body, #root {
   min-height: 100%;
-  background: #ffffff;
+  background: var(--bg);
 }
 
 body {
   margin: 0;
-  background: #ffffff;
+  background: var(--bg);
   color: var(--ink);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
-button,
-input,
-select {
+button, input, select {
   font: inherit;
   color: inherit;
 }
 
-button {
-  cursor: pointer;
-}
+button { cursor: pointer; }
+
+/* ================================================================
+   LAYOUT
+   ================================================================ */
 
 .rf-shell {
   max-width: 1440px;
@@ -55,84 +86,85 @@ button {
   padding: 32px 24px 72px;
 }
 
+/* ================================================================
+   HERO
+   ================================================================ */
+
 .rf-hero {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 32px;
   align-items: start;
-  padding: 8px 0 30px;
-  margin-bottom: 6px;
+  padding: 8px 0 28px;
+  margin-bottom: 8px;
   border-bottom: 1px solid var(--line);
 }
 
 .rf-eyebrow {
-  margin: 0 0 12px;
+  margin: 0 0 10px;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.67rem;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
-  letter-spacing: 0.18em;
-  font-size: 0.72rem;
   color: var(--ink-muted);
 }
 
 .rf-hero h1 {
   margin: 0;
-  max-width: 12ch;
-  font-size: clamp(2.5rem, 5vw, 4.6rem);
-  line-height: 0.94;
-  letter-spacing: -0.04em;
+  max-width: 24ch;
+  font-family: 'Urbanist', sans-serif;
+  font-weight: 700;
+  font-size: clamp(1.8rem, 3.5vw, 2.8rem);
+  line-height: 1.15;
+  letter-spacing: -0.025em;
+  color: var(--ink);
 }
 
 .rf-lede {
   max-width: 58ch;
-  margin: 20px 0 0;
+  margin: 14px 0 0;
   color: var(--ink-soft);
-  line-height: 1.7;
-  font-size: 1.02rem;
+  line-height: 1.68;
+  font-size: 0.95rem;
 }
 
 .rf-hero-meta {
   display: grid;
   justify-items: end;
-  padding-top: 8px;
+  padding-top: 6px;
 }
 
+/* ================================================================
+   STATUS BADGE — dot only
+   ================================================================ */
+
 .rf-status-badge {
-  --status-rgb: 245, 158, 11;
+  --status-rgb: 145, 163, 176;
   position: relative;
-  width: 16px;
-  height: 16px;
-  border-radius: 999px;
-  border: 1px solid var(--line-strong);
-  background: #ffffff;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgb(var(--status-rgb));
+  box-shadow: 0 0 0 3px rgba(var(--status-rgb), 0.15);
 }
 
 .rf-status-badge::before {
   content: '';
   position: absolute;
-  inset: 3px;
+  inset: 0;
   border-radius: inherit;
-  background: rgb(var(--status-rgb));
-  box-shadow: 0 0 0 0 rgba(var(--status-rgb), 0.32);
-  animation: rf-status-pulse 2.2s infinite;
+  box-shadow: 0 0 0 0 rgba(var(--status-rgb), 0.4);
+  animation: rf-status-pulse 2.4s infinite;
 }
 
-.rf-status-badge.is-healthy {
-  --status-rgb: 15, 118, 110;
-}
-
-.rf-status-badge.is-loading {
-  --status-rgb: 217, 119, 6;
-}
-
-.rf-status-badge.is-offline {
-  --status-rgb: 185, 28, 28;
-}
+.rf-status-badge.is-healthy   { --status-rgb: 5, 150, 105; }
+.rf-status-badge.is-loading   { --status-rgb: 217, 119, 6; }
+.rf-status-badge.is-offline   { --status-rgb: 220, 38, 38; }
 
 .rf-sr-only {
   position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
   overflow: hidden;
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
@@ -140,136 +172,137 @@ button {
 }
 
 @keyframes rf-status-pulse {
-  0% {
-    box-shadow: 0 0 0 0 rgba(var(--status-rgb), 0.26);
-  }
-  70% {
-    box-shadow: 0 0 0 9px rgba(var(--status-rgb), 0);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(var(--status-rgb), 0);
-  }
+  0%   { box-shadow: 0 0 0 0 rgba(var(--status-rgb), 0.4); }
+  70%  { box-shadow: 0 0 0 7px rgba(var(--status-rgb), 0); }
+  100% { box-shadow: 0 0 0 0 rgba(var(--status-rgb), 0); }
 }
+
+/* ================================================================
+   TOAST
+   ================================================================ */
 
 .rf-toast {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 20px;
-  margin-bottom: 22px;
-  padding: 14px 16px;
-  border-radius: 16px;
+  margin-bottom: 20px;
+  padding: 12px 16px;
+  border-radius: 12px;
   border: 1px solid var(--line);
-  background: #ffffff;
+  background: var(--bg);
   box-shadow: var(--shadow-soft);
+  font-size: 0.9rem;
 }
 
 .rf-toast button {
   border: 0;
   background: transparent;
-  color: inherit;
+  color: var(--ink-muted);
+  padding: 2px 6px;
+  border-radius: 6px;
+  transition: color 150ms, background 150ms;
 }
 
-.rf-toast.is-success {
-  color: var(--aqua);
-}
+.rf-toast button:hover { color: var(--ink); background: var(--surface); }
 
-.rf-toast.is-error {
-  color: var(--berry);
-}
+.rf-toast.is-success { color: var(--green); border-color: rgba(5, 150, 105, 0.25); }
+.rf-toast.is-error   { color: var(--red);   border-color: rgba(220, 38, 38, 0.25); }
+
+/* ================================================================
+   OVERVIEW GRID — STAT CARDS
+   ================================================================ */
 
 .rf-overview-grid {
   display: grid;
-  gap: 14px;
+  gap: 12px;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  margin-bottom: 22px;
+  margin-bottom: 20px;
 }
 
 .rf-stat-card {
   position: relative;
   display: grid;
-  gap: 16px;
-  min-height: 140px;
-  padding: 22px;
-  border-radius: 22px;
+  gap: 12px;
+  min-height: 136px;
+  padding: 20px;
+  border-radius: 14px;
   border: 1px solid var(--line);
-  background: #ffffff;
+  background: var(--bg);
   box-shadow: var(--shadow-soft);
   overflow: hidden;
+  transition: box-shadow 200ms ease, border-color 200ms ease, transform 200ms ease;
 }
 
 .rf-stat-card::before {
   content: '';
   position: absolute;
-  top: 0;
-  left: 22px;
-  width: 48px;
-  height: 3px;
-  border-radius: 999px;
+  top: 0; left: 20px;
+  width: 36px; height: 2px;
   background: var(--card-accent, var(--ink));
 }
 
+.rf-stat-card:hover {
+  box-shadow: var(--shadow-card);
+  border-color: var(--line-strong);
+  transform: translateY(-1px);
+}
+
 .rf-stat-card span {
+  font-family: 'DM Mono', monospace;
   color: var(--ink-muted);
-  font-size: 0.76rem;
+  font-size: 0.66rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
 .rf-stat-card strong {
-  font-size: clamp(1.65rem, 4vw, 2.5rem);
+  font-family: 'DM Mono', monospace;
+  font-size: clamp(1.6rem, 3.5vw, 2.3rem);
+  font-weight: 500;
   line-height: 1;
-  letter-spacing: -0.04em;
+  letter-spacing: -0.03em;
+  color: var(--ink);
 }
 
 .rf-stat-card small {
   color: var(--ink-soft);
-  line-height: 1.55;
+  font-size: 0.8rem;
+  line-height: 1.5;
 }
 
-.rf-stat-card.is-warm {
-  --card-accent: #111827;
-}
+.rf-stat-card.is-warm  { --card-accent: var(--ink); }
+.rf-stat-card.is-cool  { --card-accent: var(--accent); }
+.rf-stat-card.is-bright { --card-accent: var(--green); }
+.rf-stat-card.is-deep  { --card-accent: var(--red); }
 
-.rf-stat-card.is-cool {
-  --card-accent: #2563eb;
-}
-
-.rf-stat-card.is-bright {
-  --card-accent: #0f766e;
-}
-
-.rf-stat-card.is-deep {
-  --card-accent: #b91c1c;
-}
-
-.rf-main-grid,
-.rf-results-grid {
-  display: grid;
-  gap: 22px;
-}
+/* ================================================================
+   GRID LAYOUT
+   ================================================================ */
 
 .rf-main-grid {
+  display: grid;
+  gap: 20px;
   grid-template-columns: minmax(0, 1.35fr) minmax(340px, 0.92fr);
-  margin-bottom: 22px;
-}
-
-.rf-results-grid {
-  grid-template-columns: minmax(0, 1.35fr) minmax(0, 0.92fr);
+  margin-bottom: 20px;
 }
 
 .rf-column,
 .rf-panel-stack {
   display: grid;
-  gap: 22px;
+  gap: 20px;
 }
 
+/* ================================================================
+   PANEL
+   ================================================================ */
+
 .rf-panel {
-  border-radius: 22px;
+  border-radius: 14px;
   border: 1px solid var(--line);
-  background: #ffffff;
+  background: var(--bg);
   box-shadow: var(--shadow-soft);
-  padding: 24px;
+  padding: 22px;
 }
 
 .rf-panel-header {
@@ -284,45 +317,53 @@ button {
 
 .rf-panel-header h2 {
   margin: 0;
-  font-size: 1.12rem;
-  letter-spacing: -0.02em;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink);
 }
 
 .rf-panel-header p {
-  margin: 8px 0 0;
+  margin: 6px 0 0;
   max-width: 52ch;
-  color: var(--ink-soft);
+  color: var(--ink-muted);
   line-height: 1.6;
+  font-size: 0.84rem;
 }
+
+/* ================================================================
+   UPLOAD ZONE
+   ================================================================ */
 
 .rf-upload-zone {
   border: 1.5px dashed var(--line-strong);
-  border-radius: 20px;
-  padding: 28px;
+  border-radius: 12px;
+  padding: 28px 24px;
   display: grid;
-  gap: 18px;
-  min-height: 220px;
+  gap: 16px;
+  min-height: 200px;
   align-content: center;
-  background: var(--paper-soft);
+  background: var(--surface);
+  transition: border-color 180ms ease, background 180ms ease;
 }
 
 .rf-upload-zone.is-dragging {
-  border-color: rgba(29, 78, 216, 0.32);
-  background: #eff6ff;
+  border-color: var(--accent);
+  background: var(--accent-soft);
 }
 
-.rf-upload-zone p,
-.rf-upload-zone strong {
-  margin: 0;
-}
+.rf-upload-zone p, .rf-upload-zone strong { margin: 0; }
 
 .rf-upload-zone strong {
-  font-size: 1.04rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--ink);
 }
 
 .rf-upload-zone p {
   color: var(--ink-soft);
   line-height: 1.6;
+  font-size: 0.87rem;
 }
 
 .rf-upload-button {
@@ -330,223 +371,298 @@ button {
   align-items: center;
   justify-content: center;
   width: fit-content;
-  min-height: 46px;
+  min-height: 40px;
   padding: 0 18px;
-  border-radius: 14px;
+  border-radius: 10px;
   background: var(--ink);
-  color: #ffffff;
+  color: #fff;
   font-weight: 600;
+  font-size: 0.86rem;
+  border: none;
+  transition: background 180ms ease, transform 180ms ease;
 }
 
-.rf-upload-button input {
-  display: none;
-}
+.rf-upload-button:hover { background: #1e293b; transform: translateY(-1px); }
+.rf-upload-button input { display: none; }
 
 .rf-upload-meta {
   display: grid;
-  gap: 5px;
+  gap: 3px;
   color: var(--ink-soft);
+  font-size: 0.83rem;
 }
 
-.rf-upload-meta span {
-  font-weight: 500;
-}
+.rf-upload-meta span { font-weight: 600; color: var(--ink); }
+
+/* ================================================================
+   HEALTH STRIP / SIMULATION / STRATEGY DETAIL
+   ================================================================ */
 
 .rf-health-strip,
 .rf-simulation-panel,
 .rf-strategy-detail {
   display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
 }
 
 .rf-health-strip > div,
 .rf-simulation-panel > div,
 .rf-strategy-detail > div {
   display: grid;
-  gap: 6px;
-  padding: 14px;
-  border-radius: 16px;
-  background: var(--paper-soft);
+  gap: 5px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--surface);
   border: 1px solid var(--line);
 }
 
 .rf-health-strip span,
 .rf-simulation-panel span,
 .rf-strategy-detail span {
+  font-family: 'DM Mono', monospace;
   color: var(--ink-muted);
-  font-size: 0.78rem;
-  letter-spacing: 0.06em;
+  font-size: 0.63rem;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
 .rf-health-strip strong,
 .rf-simulation-panel strong,
 .rf-strategy-detail strong {
-  font-size: 1.02rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--ink);
 }
 
-.rf-leaderboard {
-  display: grid;
-  gap: 10px;
-}
+/* ================================================================
+   LEADERBOARD
+   ================================================================ */
+
+.rf-leaderboard { display: grid; gap: 8px; }
 
 .rf-leader-card {
   display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: 14px;
-  align-items: center;
-  padding: 14px 16px;
-  border-radius: 16px;
-  background: #ffffff;
-  border: 1px solid var(--line);
-}
-
-.rf-leader-card span,
-.rf-leader-card small {
-  color: var(--ink-soft);
-}
-
-.rf-leader-card strong,
-.rf-leader-card b {
-  font-size: 1rem;
-}
-
-.rf-strategy-grid {
-  display: grid;
+  grid-template-columns: 28px 1fr auto;
   gap: 12px;
+  align-items: center;
+  padding: 11px 14px;
+  border-radius: 10px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  transition: background 180ms ease, border-color 180ms ease;
 }
 
-.rf-strategy-card,
-.rf-mode-button,
-.rf-primary-button,
-.rf-secondary-button,
-.rf-check-item,
-.rf-upload-button {
-  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease, background 180ms ease, color 180ms ease;
+.rf-leader-card:hover { background: var(--surface); }
+
+.rf-leader-card span {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.7rem;
+  color: var(--ink-muted);
+  text-align: center;
 }
+
+.rf-leader-card strong {
+  display: block;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.rf-leader-card small {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.74rem;
+  color: var(--ink-muted);
+}
+
+.rf-leader-card b {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--green);
+}
+
+/* ================================================================
+   STRATEGY CARDS
+   ================================================================ */
+
+.rf-strategy-grid { display: grid; gap: 8px; }
 
 .rf-strategy-card {
   text-align: left;
   border: 1px solid var(--line);
-  background: #ffffff;
-  border-radius: 18px;
-  padding: 16px;
+  background: var(--bg);
+  border-radius: 12px;
+  padding: 14px 16px;
   display: grid;
-  gap: 10px;
+  gap: 6px;
+  transition: border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
+}
+
+.rf-strategy-card:hover {
+  border-color: var(--line-strong);
+  background: var(--surface);
 }
 
 .rf-strategy-card.is-active {
-  border-color: var(--ink);
-  background: var(--paper-soft);
-  box-shadow: var(--shadow-soft);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 1px rgba(29, 78, 216, 0.15);
 }
 
 .rf-strategy-head {
   display: flex;
   justify-content: space-between;
   gap: 12px;
+  align-items: baseline;
+}
+
+.rf-strategy-head strong {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.rf-strategy-card.is-active .rf-strategy-head strong {
+  color: var(--accent-text);
 }
 
 .rf-strategy-head span {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.7rem;
   color: var(--ink-muted);
-  font-size: 0.88rem;
 }
 
-.rf-strategy-card p,
-.rf-strategy-card small {
+.rf-strategy-card p {
   margin: 0;
   color: var(--ink-soft);
-  line-height: 1.55;
+  font-size: 0.82rem;
+  line-height: 1.5;
 }
+
+.rf-strategy-card small {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: 0.76rem;
+  font-family: 'DM Mono', monospace;
+}
+
+/* ================================================================
+   MODE BUTTONS
+   ================================================================ */
 
 .rf-mode-row {
   display: grid;
-  gap: 10px;
+  gap: 8px;
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .rf-mode-button,
 .rf-primary-button,
 .rf-secondary-button {
-  min-height: 48px;
-  padding: 0 16px;
-  border-radius: 14px;
-  border: 1px solid var(--line-strong);
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 10px;
   font-weight: 600;
+  font-size: 0.86rem;
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease, background 180ms ease, color 180ms ease;
 }
 
 .rf-mode-button {
-  background: #ffffff;
+  border: 1px solid var(--line-strong);
+  background: var(--bg);
+  color: var(--ink-soft);
 }
+
+.rf-mode-button:hover { border-color: var(--ink); color: var(--ink); }
 
 .rf-mode-button.is-active {
   background: var(--ink);
   border-color: var(--ink);
-  color: #ffffff;
+  color: #fff;
 }
 
 .rf-primary-button {
-  background: var(--ink);
-  border-color: var(--ink);
-  color: #ffffff;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  color: #fff;
+}
+
+.rf-primary-button:hover:not(:disabled) {
+  background: #1a45c4;
+  border-color: #1a45c4;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(29, 78, 216, 0.3);
 }
 
 .rf-secondary-button {
-  background: #ffffff;
+  background: var(--bg);
+  border: 1px solid var(--line-strong);
+  color: var(--ink-soft);
+}
+
+.rf-secondary-button:hover:not(:disabled) {
+  border-color: var(--ink);
   color: var(--ink);
 }
 
 .rf-mode-button:hover:not(:disabled),
-.rf-primary-button:hover:not(:disabled),
-.rf-secondary-button:hover:not(:disabled),
-.rf-strategy-card:hover,
 .rf-check-item:hover,
-.rf-upload-button:hover {
+.rf-upload-button:hover,
+.rf-strategy-card:hover {
   transform: translateY(-1px);
-  box-shadow: var(--shadow-soft);
 }
 
 .rf-primary-button:disabled,
 .rf-secondary-button:disabled,
 .rf-mode-button:disabled {
-  opacity: 0.55;
+  opacity: 0.45;
   cursor: default;
   box-shadow: none;
+  transform: none;
 }
 
-.rf-field {
-  display: grid;
-  gap: 10px;
-}
+/* ================================================================
+   FIELD / SELECT
+   ================================================================ */
+
+.rf-field { display: grid; gap: 8px; }
 
 .rf-field span {
-  font-size: 0.82rem;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.65rem;
   color: var(--ink-muted);
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
 }
 
 .rf-field select {
   width: 100%;
-  min-height: 50px;
-  border-radius: 14px;
+  min-height: 46px;
+  border-radius: 10px;
   border: 1px solid var(--line-strong);
-  background: #ffffff;
+  background: var(--bg);
   padding: 0 14px;
   outline: none;
+  transition: border-color 180ms ease;
+  color: var(--ink);
 }
 
-.rf-field select:focus {
-  border-color: #94a3b8;
-}
+.rf-field select:focus { border-color: var(--accent); }
+
+/* ================================================================
+   CHECKBOX LIST
+   ================================================================ */
 
 .rf-check-list {
   display: grid;
-  gap: 10px;
+  gap: 7px;
   max-height: 220px;
   overflow: auto;
   padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
 }
 
 .rf-check-item {
@@ -555,129 +671,130 @@ button {
   gap: 10px;
   align-items: center;
   border: 1px solid var(--line);
-  background: #ffffff;
-  border-radius: 14px;
-  padding: 12px 14px;
+  background: var(--bg);
+  border-radius: 10px;
+  padding: 10px 12px;
+  transition: border-color 180ms ease, background 180ms ease, transform 180ms ease;
 }
 
-.rf-check-item input {
-  accent-color: var(--ink);
-}
+.rf-check-item:hover { background: var(--surface); border-color: var(--line-strong); }
+.rf-check-item input { accent-color: var(--accent); }
+.rf-check-item small { font-family: 'DM Mono', monospace; font-size: 0.74rem; color: var(--ink-soft); }
 
-.rf-check-item small {
-  color: var(--ink-soft);
-}
+/* ================================================================
+   ACTION ROW
+   ================================================================ */
 
 .rf-action-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 10px;
 }
 
-.rf-action-row > * {
-  flex: 1 1 180px;
-}
+.rf-action-row > * { flex: 1 1 160px; }
+
+/* ================================================================
+   SUMMARY GRID
+   ================================================================ */
 
 .rf-summary-grid {
   display: grid;
-  gap: 12px;
+  gap: 10px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
+
+/* ================================================================
+   INLINE NOTES
+   ================================================================ */
 
 .rf-inline-note,
 .rf-empty-inline {
   margin: 0;
   padding: 14px 16px;
-  border-radius: 14px;
+  border-radius: 10px;
   border: 1px solid var(--line);
-  background: var(--paper-soft);
-  color: var(--ink-soft);
+  background: var(--surface);
+  color: var(--ink-muted);
+  font-size: 0.86rem;
+  line-height: 1.6;
 }
+
+/* ================================================================
+   TABLES
+   ================================================================ */
 
 .rf-table-wrap {
   overflow: auto;
-  border-radius: 18px;
+  border-radius: 12px;
   border: 1px solid var(--line);
-  background: #ffffff;
+  background: var(--bg);
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
 }
 
 .rf-table {
   width: 100%;
   min-width: 640px;
   border-collapse: collapse;
-  background: #ffffff;
+  background: var(--bg);
 }
 
 .rf-table th,
 .rf-table td {
-  padding: 14px 16px;
+  padding: 12px 14px;
   text-align: left;
   border-bottom: 1px solid var(--line);
   vertical-align: top;
 }
 
 .rf-table th {
-  font-size: 0.76rem;
-  letter-spacing: 0.08em;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.63rem;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--ink-muted);
-  background: var(--paper-soft);
+  background: var(--surface);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  transition: color 150ms ease;
 }
 
-.rf-table tbody tr:hover {
-  background: #fafafa;
-}
+.rf-table th:hover { color: var(--ink-soft); }
 
-.rf-table td strong,
-.rf-table td small {
-  display: block;
-}
+.rf-table tbody tr:hover { background: var(--surface); }
+.rf-table tbody tr:last-child td { border-bottom: none; }
 
-.rf-table td small {
-  margin-top: 4px;
-  color: var(--ink-soft);
-}
+.rf-table td { color: var(--ink-soft); font-size: 0.87rem; }
+.rf-table td strong { display: block; font-weight: 600; color: var(--ink); font-size: 0.88rem; }
+.rf-table td small  { display: block; margin-top: 3px; color: var(--ink-muted); font-size: 0.75rem; }
+
+/* ================================================================
+   RESPONSIVE
+   ================================================================ */
 
 @media (max-width: 1180px) {
   .rf-overview-grid,
-  .rf-results-grid,
-  .rf-main-grid {
-    grid-template-columns: 1fr;
-  }
+  .rf-main-grid { grid-template-columns: 1fr; }
 
   .rf-hero {
     grid-template-columns: 1fr;
-    gap: 20px;
+    gap: 16px;
   }
 
-  .rf-hero-meta {
-    justify-items: start;
-    padding-top: 0;
-  }
+  .rf-hero-meta { justify-items: start; padding-top: 0; }
 }
 
 @media (max-width: 720px) {
-  .rf-shell {
-    padding: 22px 14px 48px;
-  }
+  .rf-shell { padding: 20px 14px 48px; }
 
   .rf-overview-grid,
   .rf-summary-grid,
-  .rf-mode-row {
-    grid-template-columns: 1fr;
-  }
+  .rf-mode-row { grid-template-columns: 1fr; }
 
-  .rf-panel {
-    padding: 18px;
-    border-radius: 18px;
-  }
-
-  .rf-upload-zone {
-    min-height: 0;
-    padding: 20px;
-  }
-
-  .rf-hero h1 {
-    max-width: 10ch;
-  }
+  .rf-panel { padding: 16px; border-radius: 12px; }
+  .rf-upload-zone { min-height: 0; padding: 20px; }
 }
