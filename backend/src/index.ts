@@ -38,7 +38,7 @@ app.use('/api/data', dataRouter);
 app.use('/api/upload', uploadRouter(upload));
 
 app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  const message = error instanceof Error ? error.message : 'Unknown error';
+  const message = error instanceof Error ? error.message : 'Bilinmeyen hata';
   res.status(500).json({ ok: false, error: message });
 });
 

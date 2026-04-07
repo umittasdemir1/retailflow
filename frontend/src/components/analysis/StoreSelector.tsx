@@ -15,9 +15,9 @@ export function StoreSelector(props: {
     <>
       {props.transferType !== 'global' && (
         <label className="rf-field">
-          <span>Hedef magaza</span>
+          <span>Hedef mağaza</span>
           <select value={props.targetStore} onChange={(e) => props.onTargetChange(e.target.value)}>
-            {targetOptions.length === 0 ? <option value="">Magaza bekleniyor</option> : null}
+            {targetOptions.length === 0 ? <option value="">Mağaza bekleniyor</option> : null}
             {targetOptions.map((name) => (
               <option key={name} value={name}>{name}</option>
             ))}
@@ -25,10 +25,10 @@ export function StoreSelector(props: {
         </label>
       )}
       <div className="rf-field">
-        <span>Disla</span>
+        <span>Dışla</span>
         <div className="rf-check-list">
           {excludedOptions.length === 0 ? (
-            <p className="rf-empty-inline">Dislanabilecek magaza yok.</p>
+            <p className="rf-empty-inline">Dışlanabilecek mağaza yok.</p>
           ) : null}
           {excludedOptions.map((store) => {
             const checked = props.excludedStores.includes(store.name);

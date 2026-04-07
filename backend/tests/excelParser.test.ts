@@ -77,6 +77,6 @@ describe('excelParser', () => {
 
     fs.writeFileSync(filePath, 'Depo Adi,Urun Adi\nAnkara,Kazak\n', 'utf8');
 
-    expect(() => parseExcelFile(filePath)).toThrow(/Gerekli sutunlar eksik/);
+    expect(() => parseExcelFile(filePath)).toThrow(/Gerekli sütunlar eksik/);
   });
 });

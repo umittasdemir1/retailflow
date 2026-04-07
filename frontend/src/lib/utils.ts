@@ -10,7 +10,7 @@ export function normalizeError(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
   }
-  return 'Beklenmeyen bir hata olustu.';
+  return 'Beklenmeyen bir hata oluştu.';
 }
 
 export function buildClientFileName(

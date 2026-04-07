@@ -26,7 +26,7 @@ describe('transferEngine', () => {
       receiverStore: 'Ankara',
       quantity: 5,
       isPrioritySource: true,
-      appliedFilter: 'Max 5 adet',
+      appliedFilter: 'Maks. 5 adet',
       stockStatus: 'YUKSEK',
     });
   });
@@ -86,7 +86,7 @@ describe('transferEngine', () => {
 
     expect(result.transfers).toHaveLength(0);
     expect(result.rejectedTransfers).toHaveLength(1);
-    expect(result.rejectedTransfers[0]?.reason).toContain('STR farki yetersiz');
+    expect(result.rejectedTransfers[0]?.reason).toContain('STR farkı yetersiz');
   });
 
   it('simulates risk level from transfer volume mix', () => {

@@ -34,13 +34,13 @@ export function runTransferAnalysis(records: InventoryRecord[], request: Analyze
 
   if (request.transferType === 'targeted') {
     if (request.targetStore == null) {
-      throw new Error('Targeted analiz icin hedef magaza gerekli');
+      throw new Error('Hedefli analiz için hedef mağaza gerekli');
     }
 
     transfers = runTargetedAnalysis(allProductGroups, request.targetStore, request, prioritySources, excluded);
   } else if (request.transferType === 'size_completion') {
     if (request.targetStore == null) {
-      throw new Error('Beden tamamlama icin hedef magaza gerekli');
+      throw new Error('Beden tamamlama için hedef mağaza gerekli');
     }
 
     transfers = runSizeCompletionAnalysis(allProductGroups, request.targetStore, request, prioritySources, excluded);

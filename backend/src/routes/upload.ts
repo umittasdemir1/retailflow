@@ -7,7 +7,7 @@ export function uploadRouter(upload: multer.Multer): Router {
 
   router.post('/', upload.single('file'), (req, res) => {
     if (req.file === undefined) {
-      res.status(400).json({ ok: false, error: 'File is required' });
+      res.status(400).json({ ok: false, error: 'Dosya gerekli' });
       return;
     }
 

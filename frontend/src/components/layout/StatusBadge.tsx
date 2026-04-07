@@ -1,10 +1,16 @@
-import type { HealthResponse } from '../../lib/api';
+type StatusBadgeState = 'healthy' | 'loading' | 'offline';
 
-export function StatusBadge(props: { health: HealthResponse | undefined }) {
-  const healthy = props.health?.status === 'healthy';
+export function StatusBadge(props: { state: StatusBadgeState }) {
+  const label =
+    props.state === 'healthy'
+      ? 'API hazır'
+      : props.state === 'loading'
+        ? 'API kontrol ediliyor'
+        : 'API erişilemiyor';
+
   return (
-    <div className={healthy ? 'rf-status-badge is-healthy' : 'rf-status-badge'}>
-      {healthy ? 'API Hazir' : 'API bekleniyor'}
+    <div className={`rf-status-badge is-${props.state}`} role="status" aria-label={label} title={label}>
+      <span className="rf-sr-only">{label}</span>
     </div>
   );
 }

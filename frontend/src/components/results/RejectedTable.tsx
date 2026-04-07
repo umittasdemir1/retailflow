@@ -12,7 +12,7 @@ import type { RejectedTransfer } from '@retailflow/shared';
 const COLUMNS: ColumnDef<RejectedTransfer>[] = [
   {
     id: 'urun',
-    header: 'Urun',
+    header: 'Ürün',
     accessorFn: (row) => row.productName,
     cell: ({ row }) => (
       <td>
@@ -21,7 +21,7 @@ const COLUMNS: ColumnDef<RejectedTransfer>[] = [
       </td>
     ),
   },
-  { accessorKey: 'storeCount', header: 'Magaza sayisi' },
+  { accessorKey: 'storeCount', header: 'Mağaza sayısı' },
   {
     accessorKey: 'strDiff',
     header: 'STR fark',
@@ -43,7 +43,7 @@ export function RejectedTable(props: { rows: RejectedTransfer[] }) {
   });
 
   if (props.rows.length === 0) {
-    return <div className="rf-inline-note">Red edilen urun bulunmuyor.</div>;
+    return <div className="rf-inline-note">Reddedilen ürün bulunmuyor.</div>;
   }
 
   return (

@@ -44,7 +44,7 @@ export function checkTransferConditions(
   if (senderInventory < config.minInventory) {
     return {
       eligible: false,
-      reason: `Gonderen envanter yetersiz (${senderInventory} < ${config.minInventory})`,
+      reason: `Gönderen envanter yetersiz (${senderInventory} < ${config.minInventory})`,
     };
   }
 
@@ -55,13 +55,13 @@ export function checkTransferConditions(
   if (strDiff < config.minStrDiff) {
     return {
       eligible: false,
-      reason: `STR farki yetersiz (${(strDiff * 100).toFixed(1)}% < ${(config.minStrDiff * 100).toFixed(1)}%)`,
+      reason: `STR farkı yetersiz (${(strDiff * 100).toFixed(1)}% < ${(config.minStrDiff * 100).toFixed(1)}%)`,
     };
   }
 
   const transfer = computeStrBasedTransfer(senderSales, senderInventory, receiverSales, receiverInventory, config);
   if (transfer.quantity <= 0) {
-    return { eligible: false, reason: 'Transfer miktari hesaplanamadi' };
+    return { eligible: false, reason: 'Transfer miktarı hesaplanamadı' };
   }
 
   return {
@@ -89,17 +89,17 @@ export function computeStrBasedTransfer(
 
   if (maxTransfer40 < rawQuantity) {
     rawQuantity = maxTransfer40;
-    appliedFilter = 'Max %40';
+    appliedFilter = 'Maks. %40';
   }
 
   if (minRemaining < rawQuantity) {
     rawQuantity = minRemaining;
-    appliedFilter = `Min ${config.minInventory} kalsin`;
+    appliedFilter = `Min ${config.minInventory} kalsın`;
   }
 
   if (config.maxTransfer != null && config.maxTransfer < rawQuantity) {
     rawQuantity = config.maxTransfer;
-    appliedFilter = `Max ${config.maxTransfer} adet`;
+    appliedFilter = `Maks. ${config.maxTransfer} adet`;
   }
 
   rawQuantity = Math.max(0, Math.min(rawQuantity, senderInventory));

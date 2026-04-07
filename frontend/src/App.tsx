@@ -55,6 +55,14 @@ export default function App() {
   const topStores = stores.slice().sort((a, b) => b.strPercent - a.strPercent);
   const currentStrategyConfig = strategies.find((s) => s.name === strategy) ?? null;
   const analysisControlsDisabled = (health?.dataLoaded ?? false) === false || analyzeMutation.isPending;
+  const healthState =
+    healthQuery.isError
+      ? 'offline'
+      : healthQuery.isLoading || healthQuery.isFetching
+        ? 'loading'
+        : health?.status === 'healthy'
+          ? 'healthy'
+          : 'offline';
 
   useEffect(() => {
     if (strategies.length > 0 && !strategies.some((s) => s.name === strategy)) {
@@ -83,7 +91,7 @@ export default function App() {
     uploadMutation.mutate(file, {
       onSuccess: (data) => {
         setAnalysis(null);
-        setToast({ tone: 'success', text: data.fileName + ' yuklendi. ' + data.rowCount + ' satir isleme alindi.' });
+        setToast({ tone: 'success', text: data.fileName + ' yüklendi. ' + data.rowCount + ' satır işleme alındı.' });
       },
       onError: (e) => setToast({ tone: 'error', text: normalizeError(e) }),
     });
@@ -93,7 +101,7 @@ export default function App() {
     analyzeMutation.mutate(activePayload, {
       onSuccess: (data) => {
         setAnalysis(data.results);
-        setToast({ tone: 'success', text: data.results.totalTransferCount + ' transfer onerisi hazirlandi.' });
+        setToast({ tone: 'success', text: data.results.totalTransferCount + ' transfer önerisi hazırlandı.' });
       },
       onError: (e) => setToast({ tone: 'error', text: normalizeError(e) }),
     });
@@ -103,7 +111,7 @@ export default function App() {
     simulateMutation.mutate(undefined, {
       onSuccess: (data) => {
         setAnalysis((current) => current ? { ...current, simulation: data.impact } : current);
-        setToast({ tone: 'info', text: 'Simulasyon guncellendi.' });
+        setToast({ tone: 'info', text: 'Simülasyon güncellendi.' });
       },
       onError: (e) => setToast({ tone: 'error', text: normalizeError(e) }),
     });
@@ -125,7 +133,7 @@ export default function App() {
         setAnalysis(null);
         setTargetStore('');
         setExcludedStores([]);
-        setToast({ tone: 'info', text: 'Tum veriler temizlendi.' });
+        setToast({ tone: 'info', text: 'Tüm veriler temizlendi.' });
       },
       onError: (e) => setToast({ tone: 'error', text: normalizeError(e) }),
     });
@@ -136,18 +144,13 @@ export default function App() {
       <section className="rf-hero">
         <div>
           <p className="rf-eyebrow">RetailFlow</p>
-          <h1>Stok transfer operasyonunu tek ekranda yonet</h1>
+          <h1>Stok transfer operasyonunu tek ekranda yönet</h1>
           <p className="rf-lede">
-            Excel yukle, magaza STR dagilimini incele, uygun stratejiyi sec ve global, hedefli veya beden tamamlama analizini tek akista calistir.
+            Excel yükle, mağaza STR dağılımını incele, uygun stratejiyi seç ve global, hedefli veya beden tamamlama analizini tek akışta çalıştır.
           </p>
         </div>
         <div className="rf-hero-meta">
-          <StatusBadge health={health} />
-          <div className="rf-chip-row">
-            <span className="rf-chip">Monorepo aktif</span>
-            <span className="rf-chip">Node 22</span>
-            <span className="rf-chip">Render + Netlify</span>
-          </div>
+          <StatusBadge state={healthState} />
         </div>
       </section>
 
@@ -157,7 +160,7 @@ export default function App() {
 
       <section className="rf-main-grid">
         <div className="rf-column rf-column-wide">
-          <Panel title="1. Veri yukleme" subtitle="CSV veya Excel dosyasini birak ya da sec.">
+          <Panel title="1. Veri yükleme" subtitle="CSV veya Excel dosyasını bırak ya da seç.">
             <UploadZone
               isUploading={uploadMutation.isPending}
               uploadInfo={uploadMutation.data ?? null}
@@ -165,7 +168,7 @@ export default function App() {
             />
           </Panel>
 
-          <Panel title="2. Operasyon panosu" subtitle="Yuklenen verinin genel resmini ve magaza dagilimini incele.">
+          <Panel title="2. Operasyon panosu" subtitle="Yüklenen verinin genel resmini ve mağaza dağılımını incele.">
             <div className="rf-panel-stack">
               <HealthStrip health={health} />
               <StoreLeaderboard stores={topStores.slice(0, 5)} />
@@ -176,7 +179,7 @@ export default function App() {
         </div>
 
         <div className="rf-column rf-column-side">
-          <Panel title="3. Analiz kontrolleri" subtitle="Stratejiyi, analiz modunu ve hedef magazayi sec.">
+          <Panel title="3. Analiz kontrolleri" subtitle="Stratejiyi, analiz modunu ve hedef mağazayı seç.">
             <div className="rf-panel-stack">
               <StrategySelector strategies={strategies} selected={strategy} onChange={setStrategy} />
               <TransferTypeSelector selected={transferType} onChange={setTransferType} />
@@ -190,7 +193,7 @@ export default function App() {
               />
               <div className="rf-action-row">
                 <button type="button" className="rf-primary-button" disabled={analysisControlsDisabled} onClick={handleAnalyze}>
-                  {analyzeMutation.isPending ? 'Analiz calisiyor...' : 'Analizi Baslat'}
+                  {analyzeMutation.isPending ? 'Analiz çalışıyor...' : 'Analizi Başlat'}
                 </button>
                 <button type="button" className="rf-secondary-button" disabled={(health?.dataLoaded ?? false) === false || resetMutation.isPending} onClick={handleReset}>
                   {resetMutation.isPending ? 'Temizleniyor...' : 'Veriyi Temizle'}
@@ -200,13 +203,13 @@ export default function App() {
             </div>
           </Panel>
 
-          <Panel title="4. Sonuclar" subtitle="Transfer ozeti, risk ve export akisi.">
+          <Panel title="4. Sonuçlar" subtitle="Transfer özeti, risk ve export akışı.">
             <div className="rf-panel-stack">
               <SummaryPanel analysis={analysis} />
               <SimulationPanel analysis={analysis} isRefreshing={simulateMutation.isPending} onRefresh={handleSimulate} />
               <div className="rf-action-row">
                 <button type="button" className="rf-primary-button" disabled={analysis == null || exportMutation.isPending} onClick={handleExport}>
-                  {exportMutation.isPending ? 'Rapor hazirlaniyor...' : 'Excel Indir'}
+                  {exportMutation.isPending ? 'Rapor hazırlanıyor...' : 'Excel İndir'}
                 </button>
               </div>
             </div>
@@ -216,14 +219,14 @@ export default function App() {
 
       <section className="rf-results-grid">
         <Panel
-          title="Transfer onerileri"
-          subtitle={analysis ? 'Toplam: ' + analysis.totalTransferCount + ' · ' + analysis.transfers.length + ' satir gosteriliyor' : 'Analiz sonuclari burada listelenecek.'}
+          title="Transfer önerileri"
+          subtitle={analysis ? 'Toplam: ' + analysis.totalTransferCount + ' · ' + analysis.transfers.length + ' satır gösteriliyor' : 'Analiz sonuçları burada listelenecek.'}
         >
           <TransferTable rows={analysis?.transfers ?? []} />
         </Panel>
         <Panel
-          title="Red edilenler"
-          subtitle={analysis ? analysis.rejectedTransfers.length + ' red kaydi' : 'Kosullari saglamayan urunler analiz sonrasinda burada gorunur.'}
+          title="Reddedilenler"
+          subtitle={analysis ? analysis.rejectedTransfers.length + ' red kaydı' : 'Koşulları sağlamayan ürünler analiz sonrasında burada görünür.'}
         >
           <RejectedTable rows={analysis?.rejectedTransfers ?? []} />
         </Panel>

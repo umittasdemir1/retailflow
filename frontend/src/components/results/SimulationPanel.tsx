@@ -10,11 +10,11 @@ export function SimulationPanel(props: {
   if (props.analysis == null) return null;
   return (
     <div className="rf-simulation-panel">
-      <div><span>Ortalama STR iyilesmesi</span><strong>{props.analysis.simulation.averageStrImprovement.toFixed(1)}%</strong></div>
-      <div><span>Oncelikli transfer</span><strong>{props.analysis.simulation.priorityTransfers}</strong></div>
-      <div><span>Bellek kullanimi</span><strong>{props.analysis.memoryUsage.afterAnalysis}%</strong></div>
+      <div><span>Ortalama STR iyileşmesi</span><strong>{props.analysis.simulation.averageStrImprovement.toFixed(1)}%</strong></div>
+      <div><span>Öncelikli transfer</span><strong>{props.analysis.simulation.priorityTransfers}</strong></div>
+      <div><span>Bellek kullanımı</span><strong>{props.analysis.memoryUsage.afterAnalysis}%</strong></div>
       <button type="button" className="rf-secondary-button" onClick={props.onRefresh} disabled={props.isRefreshing}>
-        {props.isRefreshing ? 'Guncelleniyor...' : 'Simulasyonu Yenile'}
+        {props.isRefreshing ? 'Güncelleniyor...' : 'Simülasyonu Yenile'}
       </button>
     </div>
   );

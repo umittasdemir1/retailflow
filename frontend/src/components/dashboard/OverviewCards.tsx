@@ -16,10 +16,10 @@ export function OverviewCards(props: {
 
   return (
     <section className="rf-overview-grid">
-      <StatCard label="Yuklu satir" value={props.uploadInfo?.rowCount ?? 0} detail={props.uploadInfo?.fileName ?? 'Dosya yuklenmedi'} accent="warm" />
-      <StatCard label="Magaza" value={props.health?.storeCount ?? props.stores.length} detail="Analizde aktif magaza sayisi" accent="cool" />
-      <StatCard label="Satis / Envanter" value={totalSales + ' / ' + totalInventory} detail="Yuklenen veri uzerinden toplandi" accent="bright" />
-      <StatCard label="Ortalama STR" value={averageStr.toFixed(1) + '%'} detail="Magaza bazli ortalama" accent="deep" />
+      <StatCard label="Yüklü satır" value={props.uploadInfo?.rowCount ?? 0} detail={props.uploadInfo?.fileName ?? 'Dosya yüklenmedi'} accent="warm" />
+      <StatCard label="Mağaza" value={props.health?.storeCount ?? props.stores.length} detail="Analizde aktif mağaza sayısı" accent="cool" />
+      <StatCard label="Satış / Envanter" value={totalSales + ' / ' + totalInventory} detail="Yüklenen veri üzerinden toplandı" accent="bright" />
+      <StatCard label="Ortalama STR" value={averageStr.toFixed(1) + '%'} detail="Mağaza bazlı ortalama" accent="deep" />
     </section>
   );
 }

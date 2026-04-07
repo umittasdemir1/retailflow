@@ -12,7 +12,7 @@ import type { TransferSuggestion } from '@retailflow/shared';
 const COLUMNS: ColumnDef<TransferSuggestion>[] = [
   {
     id: 'urun',
-    header: 'Urun',
+    header: 'Ürün',
     accessorFn: (row) => row.productName,
     cell: ({ row }) => (
       <td>
@@ -21,7 +21,7 @@ const COLUMNS: ColumnDef<TransferSuggestion>[] = [
       </td>
     ),
   },
-  { accessorKey: 'senderStore', header: 'Gonderen' },
+  { accessorKey: 'senderStore', header: 'Gönderen' },
   { accessorKey: 'receiverStore', header: 'Alan' },
   { accessorKey: 'quantity', header: 'Miktar' },
   {
@@ -33,7 +33,7 @@ const COLUMNS: ColumnDef<TransferSuggestion>[] = [
   {
     accessorKey: 'isPrioritySource',
     header: 'Kaynak',
-    cell: ({ getValue }) => (getValue<boolean>() ? 'Oncelikli' : 'Standart'),
+    cell: ({ getValue }) => (getValue<boolean>() ? 'Öncelikli' : 'Standart'),
   },
 ];
 
@@ -50,7 +50,7 @@ export function TransferTable(props: { rows: TransferSuggestion[] }) {
   });
 
   if (props.rows.length === 0) {
-    return <div className="rf-inline-note">Transfer sonuclari burada listelenecek.</div>;
+    return <div className="rf-inline-note">Transfer sonuçları burada listelenecek.</div>;
   }
 
   return (

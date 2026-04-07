@@ -5,16 +5,16 @@ import { sessionStore } from '../store/sessionStore.js';
 export function runAnalysis(request: AnalyzeRequest): AnalysisResult {
   const state = sessionStore.get();
   if (state.data === null) {
-    throw new Error('Once veri yukleyin');
+    throw new Error('Önce veri yükleyin');
   }
 
   if (request.transferType !== 'global') {
     if (request.targetStore == null || request.targetStore.length === 0) {
-      throw new Error('Gecerli bir hedef magaza secin');
+      throw new Error('Geçerli bir hedef mağaza seçin');
     }
 
     if (!state.stores.includes(request.targetStore)) {
-      throw new Error('Gecerli bir hedef magaza secin');
+      throw new Error('Geçerli bir hedef mağaza seçin');
     }
   }
 

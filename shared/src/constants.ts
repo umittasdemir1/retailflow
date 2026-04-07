@@ -4,7 +4,7 @@ export const STRATEGY_CONFIGS: Record<RetailFlowStrategy, StrategyConfig> = {
   sakin: {
     name: 'sakin',
     label: 'Sakin',
-    description: 'Guvenli ve kontrollu transfer yaklasimi',
+    description: 'Güvenli ve kontrollü transfer yaklaşımı',
     minStrDiff: 0.15,
     minInventory: 3,
     maxTransfer: 5,
@@ -14,7 +14,7 @@ export const STRATEGY_CONFIGS: Record<RetailFlowStrategy, StrategyConfig> = {
   },
   kontrollu: {
     name: 'kontrollu',
-    label: 'Kontrollu',
+    label: 'Kontrollü',
     description: 'Dengeli risk ve performans',
     minStrDiff: 0.1,
     minInventory: 2,
@@ -26,7 +26,7 @@ export const STRATEGY_CONFIGS: Record<RetailFlowStrategy, StrategyConfig> = {
   agresif: {
     name: 'agresif',
     label: 'Agresif',
-    description: 'Maksimum performans odakli',
+    description: 'Maksimum performans odaklı',
     minStrDiff: 0.08,
     minInventory: 1,
     maxTransfer: null,

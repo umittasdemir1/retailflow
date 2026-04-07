@@ -51,7 +51,7 @@ export function parseExcelFile(filePath: string): ParsedUpload {
     .filter((row) => row.warehouseName.length > 0 && row.productName.length > 0);
 
   if (records.length === 0) {
-    throw new Error('Yuklenen dosyada islenebilir veri bulunamadi');
+    throw new Error('Yüklenen dosyada işlenebilir veri bulunamadı');
   }
 
   const stores = Array.from(new Set(records.map((record) => record.warehouseName))).sort((a, b) => a.localeCompare(b, 'tr'));
@@ -92,7 +92,7 @@ function assertRequiredColumns(columns: string[]): void {
 
   const missing = requiredTargets.filter((target) => availableTargets.has(target) === false);
   if (missing.length > 0) {
-    throw new Error('Gerekli sutunlar eksik: ' + missing.join(', '));
+    throw new Error('Gerekli sütunlar eksik: ' + missing.join(', '));
   }
 }
 

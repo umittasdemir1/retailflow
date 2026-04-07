@@ -18,7 +18,7 @@ analyzeRouter.post('/', (req, res) => {
       results: buildAnalyzeResponse(result, beforeAnalysis, afterAnalysis),
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
+    const message = error instanceof Error ? error.message : 'Bilinmeyen hata';
     const statusCode = isValidationError(message) ? 400 : 500;
     res.status(statusCode).json({ ok: false, error: message });
   }
@@ -48,9 +48,9 @@ function buildAnalyzeResponse(result: AnalysisResult, beforeAnalysis: number, af
 
 function isValidationError(message: string): boolean {
   return [
-    'Once veri yukleyin',
-    'Gecerli bir hedef magaza secin',
-    'Targeted analiz icin hedef magaza gerekli',
-    'Beden tamamlama icin hedef magaza gerekli',
+    'Önce veri yükleyin',
+    'Geçerli bir hedef mağaza seçin',
+    'Hedefli analiz için hedef mağaza gerekli',
+    'Beden tamamlama için hedef mağaza gerekli',
   ].includes(message);
 }
