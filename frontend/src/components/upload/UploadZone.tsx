@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { UploadResult } from '@retailflow/shared';
+import fileIcon from '../../assets/icons/3dfilesicon.svg';
 
 export function UploadZone(props: { isUploading: boolean; uploadInfo: UploadResult | null; onFileSelect: (file: File) => void }) {
   const [dragActive, setDragActive] = useState(false);
@@ -29,6 +30,7 @@ export function UploadZone(props: { isUploading: boolean; uploadInfo: UploadResu
             if (file) props.onFileSelect(file);
           }}
         />
+        <img src={fileIcon} alt="" width={18} height={18} style={{ flexShrink: 0 }} />
         {props.isUploading ? 'Yükleniyor...' : 'Dosya Seç'}
       </label>
       <div className="rf-upload-meta">

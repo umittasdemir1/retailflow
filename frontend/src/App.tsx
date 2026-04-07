@@ -8,7 +8,7 @@ import { useExport, useReset } from './hooks/useExport';
 import { useHealth, useStores, useStrategies } from './hooks/useStores';
 
 import { Panel } from './components/ui/Panel';
-import { ToastBanner, type ToastState } from './components/ui/Toast';
+import { Notifications, createNotif, type NotifItem } from './components/ui/Notifications';
 import { StatusBadge } from './components/layout/StatusBadge';
 import { OverviewCards } from './components/dashboard/OverviewCards';
 import { UploadZone } from './components/upload/UploadZone';
@@ -35,7 +35,7 @@ export default function App() {
   const [targetStore, setTargetStore] = useState('');
   const [excludedStores, setExcludedStores] = useState<string[]>([]);
   const [analysis, setAnalysis] = useState<AnalysisView | null>(null);
-  const [toast, setToast] = useState<ToastState>(null);
+  const [notifs, setNotifs] = useState<NotifItem[]>([]);
 
   const healthQuery = useHealth();
   const strategiesQuery = useStrategies();
@@ -85,13 +85,21 @@ export default function App() {
     excludedStores,
   };
 
+  function notify(type: NotifItem['type'], message: string) {
+    setNotifs((prev) => [...prev, createNotif(type, message)]);
+  }
+
+  function dismissNotif(id: string) {
+    setNotifs((prev) => prev.filter((n) => n.id !== id));
+  }
+
   function handleUpload(file: File) {
     uploadMutation.mutate(file, {
       onSuccess: (data) => {
         setAnalysis(null);
-        setToast({ tone: 'success', text: data.fileName + ' yüklendi. ' + data.rowCount + ' satır işleme alındı.' });
+        notify('success', data.fileName + ' yüklendi — ' + data.rowCount.toLocaleString('tr-TR') + ' satır');
       },
-      onError: (e) => setToast({ tone: 'error', text: normalizeError(e) }),
+      onError: (e) => notify('error', normalizeError(e)),
     });
   }
 
@@ -99,9 +107,9 @@ export default function App() {
     analyzeMutation.mutate(activePayload, {
       onSuccess: (data) => {
         setAnalysis(data.results);
-        setToast({ tone: 'success', text: data.results.totalTransferCount + ' transfer önerisi hazırlandı.' });
+        notify('success', data.results.totalTransferCount + ' transfer önerisi hazırlandı');
       },
-      onError: (e) => setToast({ tone: 'error', text: normalizeError(e) }),
+      onError: (e) => notify('error', normalizeError(e)),
     });
   }
 
@@ -109,9 +117,9 @@ export default function App() {
     simulateMutation.mutate(undefined, {
       onSuccess: (data) => {
         setAnalysis((current) => current ? { ...current, simulation: data.impact } : current);
-        setToast({ tone: 'info', text: 'Simülasyon güncellendi.' });
+        notify('info', 'Simülasyon güncellendi');
       },
-      onError: (e) => setToast({ tone: 'error', text: normalizeError(e) }),
+      onError: (e) => notify('error', normalizeError(e)),
     });
   }
 
@@ -119,9 +127,9 @@ export default function App() {
     exportMutation.mutate(activePayload, {
       onSuccess: (blob) => {
         downloadBlob(blob, buildClientFileName(transferType, targetStore, strategy));
-        setToast({ tone: 'success', text: 'Excel raporu indirildi.' });
+        notify('success', 'Excel raporu indirildi');
       },
-      onError: (e) => setToast({ tone: 'error', text: normalizeError(e) }),
+      onError: (e) => notify('error', normalizeError(e)),
     });
   }
 
@@ -131,14 +139,16 @@ export default function App() {
         setAnalysis(null);
         setTargetStore('');
         setExcludedStores([]);
-        setToast({ tone: 'info', text: 'Tüm veriler temizlendi.' });
+        notify('info', 'Tüm veriler temizlendi');
       },
-      onError: (e) => setToast({ tone: 'error', text: normalizeError(e) }),
+      onError: (e) => notify('error', normalizeError(e)),
     });
   }
 
   return (
     <main className="rf-shell">
+      <Notifications items={notifs} onDismiss={dismissNotif} />
+
       <section className="rf-hero">
         <div>
           <p className="rf-eyebrow">RetailFlow</p>
@@ -151,8 +161,6 @@ export default function App() {
           <StatusBadge state={healthState} />
         </div>
       </section>
-
-      {toast ? <ToastBanner toast={toast} onClose={() => setToast(null)} /> : null}
 
       <OverviewCards uploadInfo={uploadMutation.data ?? null} health={health} stores={stores} />
 
