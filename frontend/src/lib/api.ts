@@ -92,3 +92,38 @@ export async function simulateCurrentAnalysis(): Promise<SimulateResponse> {
   const response = await api.post<SimulateResponse>('/simulate');
   return response.data;
 }
+
+export interface ProductSummary {
+  productCode: string;
+  productName: string;
+  imageUrl: string | null;
+  colors: string[];
+  sizes: string[];
+  totalInventory: number;
+  totalSales: number;
+  totalReturns: number;
+  str: number;
+  strPercent: number;
+  storeCount: number;
+  variantCount: number;
+  gender: string | null;
+  stockStatus: 'KRITIK' | 'DUSUK' | 'NORMAL' | 'YUKSEK';
+  price: number | null;
+  category: string | null;
+}
+
+export interface ProductsResponse {
+  products: ProductSummary[];
+  stats: {
+    totalProducts: number;
+    totalSold: number;
+    totalReturned: number;
+    avgStrPercent: number;
+    bestSeller: { productName: string; totalSales: number } | null;
+  };
+}
+
+export async function fetchProducts(): Promise<ProductsResponse> {
+  const response = await api.get<ProductsResponse>('/products');
+  return response.data;
+}

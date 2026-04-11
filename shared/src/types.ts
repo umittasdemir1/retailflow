@@ -27,6 +27,9 @@ export interface InventoryRecord {
   lastSaleDate?: string | null;
   firstStockEntryDate?: string | null;
   firstSaleDate?: string | null;
+  itemUrl?: string | null;
+  price?: number | null;
+  category?: string | null;
 }
 
 export interface ProductVariantKey {

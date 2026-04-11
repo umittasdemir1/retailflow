@@ -15,9 +15,13 @@
     "@retailflow/shared": "file:../shared",
     "@tanstack/react-query": "^5.71.10",
     "@tanstack/react-table": "^8.21.3",
+    "apexcharts": "^5.10.5",
     "axios": "^1.8.4",
+    "echarts": "^6.0.0",
+    "echarts-for-react": "^3.0.6",
     "lucide-react": "1.7.0",
     "react": "18.3.1",
+    "react-apexcharts": "^2.1.0",
     "react-dom": "18.3.1",
     "recharts": "3.8.1"
   },

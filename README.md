@@ -1,5 +1,6 @@
 # RetailFlow
 
+
 Perakende tekstil mağazaları arası stok transfer optimizasyon sistemi.
 
 ## Yapı

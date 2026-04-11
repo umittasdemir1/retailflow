@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { fetchHealth, fetchStores, fetchStrategies } from '../lib/api';
+import { fetchHealth, fetchProducts, fetchStores, fetchStrategies } from '../lib/api';
 
 export function useHealth() {
   return useQuery({
@@ -21,5 +21,12 @@ export function useStrategies() {
     queryKey: ['strategies'],
     queryFn: fetchStrategies,
     staleTime: 60_000,
+  });
+}
+
+export function useProducts() {
+  return useQuery({
+    queryKey: ['products'],
+    queryFn: fetchProducts,
   });
 }

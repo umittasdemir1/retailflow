@@ -6,6 +6,7 @@ import { analyzeRouter } from './routes/analyze.js';
 import { dataRouter } from './routes/data.js';
 import { exportRouter } from './routes/export.js';
 import { healthRouter } from './routes/health.js';
+import { productsRouter } from './routes/products.js';
 import { simulateRouter } from './routes/simulate.js';
 import { storesRouter } from './routes/stores.js';
 import { strategiesRouter } from './routes/strategies.js';
@@ -29,6 +30,7 @@ app.use((req, res, next) => {
 });
 
 app.use('/api/health', healthRouter);
+app.use('/api/products', productsRouter);
 app.use('/api/stores', storesRouter);
 app.use('/api/strategies', strategiesRouter);
 app.use('/api/analyze', analyzeRouter);

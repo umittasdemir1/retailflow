@@ -28,6 +28,22 @@ const columnMap = {
   'İlk Stok Giriş Tarihi': 'firstStockEntryDate',
   'Ilk Satis Tarihi': 'firstSaleDate',
   'İlk Satış Tarihi': 'firstSaleDate',
+  'Item URL': 'itemUrl',
+  'Item Url': 'itemUrl',
+  'item url': 'itemUrl',
+  'Gorsel': 'itemUrl',
+  'Görsel': 'itemUrl',
+  'Resim': 'itemUrl',
+  'Urun Resmi': 'itemUrl',
+  'Ürün Resmi': 'itemUrl',
+  'Price': 'price',
+  'Fiyat': 'price',
+  'Satis Fiyati': 'price',
+  'Satış Fiyatı': 'price',
+  'Category': 'category',
+  'Kategori': 'category',
+  'Urun Kategorisi': 'category',
+  'Ürün Kategorisi': 'category',
 } as const;
 
 type ColumnTarget = (typeof columnMap)[keyof typeof columnMap];
@@ -105,6 +121,9 @@ function normalizeRow(row: Record<string, unknown>): InventoryRecord {
     size: '',
     salesQty: 0,
     inventory: 0,
+    itemUrl: null,
+    price: null,
+    category: null,
   };
 
   for (const [sourceKey, targetKey] of Object.entries(columnMap) as Array<[string, ColumnTarget]>) {
@@ -113,7 +132,7 @@ function normalizeRow(row: Record<string, unknown>): InventoryRecord {
       continue;
     }
 
-    if (targetKey === 'salesQty' || targetKey === 'inventory' || targetKey === 'returnQty' || targetKey === 'productionYear') {
+    if (targetKey === 'salesQty' || targetKey === 'inventory' || targetKey === 'returnQty' || targetKey === 'productionYear' || targetKey === 'price') {
       normalized[targetKey] = parseLocaleNumber(value);
       continue;
     }
