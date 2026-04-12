@@ -2,7 +2,7 @@ services:
   - type: web
     name: retailflow-api
     runtime: node
-    buildCommand: npm ci && npm run build --workspace @retailflow/shared && npm run build --workspace backend
+    buildCommand: npm ci && npm run build --workspace @retailflow/shared && npm run build --workspace backend && mkdir -p backend/models && ([ -f backend/models/yolov8n.onnx ] || curl -fsSL -o backend/models/yolov8n.onnx "https://github.com/ultralytics/assets/releases/download/v0.0.0/yolov8n.onnx" || echo "Model download skipped - grid fallback will be used")
     startCommand: cd backend && npm start
     envVars:
       - key: PORT

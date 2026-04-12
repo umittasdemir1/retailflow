@@ -151,3 +151,86 @@ export interface ExportRequest {
   excludedStores?: string[];
   prioritySources?: string[];
 }
+
+// ─── Vision / Visual Recognition ────────────────────────────────────────────
+
+export interface DetectedAttributes {
+  dominantColor: string;
+  colorHex: string;
+  colorTr: string;
+}
+
+/** One location where a catalog product was found in the shelf photo */
+export interface FoundLocation {
+  boundingBox: { x: number; y: number; width: number; height: number };
+  confidence: number; // 0-100
+}
+
+/** Recognition result — one entry per catalog product */
+export interface RecognizedProduct {
+  catalogProductId: string;
+  productCode: string;
+  productName: string;
+  color: string;
+  description: string;
+  /** Locations found in the shelf photo, sorted by confidence desc */
+  foundAt: FoundLocation[];
+  bestConfidence: number; // 0-100, 0 = not found
+  found: boolean;
+  // Sales data (null if no inventory loaded)
+  totalSales:     number | null;
+  totalInventory: number | null;
+  strPercent:     number | null;
+  storeCount:     number | null;
+}
+
+export interface VisionRecognizeResponse {
+  imageWidth: number;
+  imageHeight: number;
+  /** One entry per catalog product */
+  recognizedProducts: RecognizedProduct[];
+  scannedRegions: number;
+  processingTimeMs: number;
+  modelVersion: string;
+}
+
+// Keep DetectedProduct for backwards-compat shape (used in canvas drawing)
+export interface DetectedProduct {
+  id: number;
+  boundingBox: { x: number; y: number; width: number; height: number };
+  confidence: number;
+  classId: number;
+  className: string;
+  attributes: DetectedAttributes;
+  matches: CatalogMatch[];
+}
+
+export interface CatalogMatch {
+  catalogProductId: string;
+  productCode: string;
+  productName: string;
+  color: string;
+  description: string;
+  matchScore: number;
+  totalSales:     number | null;
+  totalInventory: number | null;
+  strPercent:     number | null;
+  storeCount:     number | null;
+}
+
+export interface VisionStatusResponse {
+  ready: boolean;
+  modelName: string;
+  loadTimeMs: number | null;
+}
+
+/** A product in the visual catalog (reference image + metadata) */
+export interface CatalogProductPublic {
+  id: string;
+  productCode: string;
+  productName: string;
+  color: string;
+  description: string;
+  imageNames: string[];  // tüm referans görseller (ilki thumbnail olarak kullanılır)
+  addedAt: string;
+}

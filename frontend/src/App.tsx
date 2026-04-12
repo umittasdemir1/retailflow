@@ -19,6 +19,7 @@ import { TransferTypeSelector } from './components/analysis/TransferTypeSelector
 import { StoreSelector } from './components/analysis/StoreSelector';
 import { ProductsPage } from './components/products/ProductsPage';
 import { LocationsPage } from './components/locations/LocationsPage';
+import { VisionPage } from './components/vision/VisionPage';
 import { SummaryPanel } from './components/results/SummaryPanel';
 import { SimulationPanel } from './components/results/SimulationPanel';
 import { TransferTable } from './components/results/TransferTable';
@@ -311,6 +312,9 @@ export default function App() {
             </Panel>
           </div>
         )}
+
+        {/* ─── VISION ─── */}
+        {activePage === 'vision' && <VisionPage />}
 
       </AppShell>
     </>

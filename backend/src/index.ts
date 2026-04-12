@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import cors from 'cors';
 import express from 'express';
 import multer from 'multer';
@@ -11,10 +14,26 @@ import { simulateRouter } from './routes/simulate.js';
 import { storesRouter } from './routes/stores.js';
 import { strategiesRouter } from './routes/strategies.js';
 import { uploadRouter } from './routes/upload.js';
+import { visionRouter } from './routes/vision.js';
+import { warmUpPythonVision } from './services/pythonVision.js';
 
 const app = express();
+const uploadDir = path.resolve(appConfig.uploadDir);
+
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
 const upload = multer({
-  dest: appConfig.uploadDir,
+  storage: multer.diskStorage({
+    destination: (_req, _file, callback) => {
+      callback(null, uploadDir);
+    },
+    filename: (_req, file, callback) => {
+      const extension = path.extname(file.originalname ?? '').toLowerCase();
+      callback(null, `${randomUUID()}${extension}`);
+    },
+  }),
   limits: {
     fileSize: 100 * 1024 * 1024,
   },
@@ -38,6 +57,7 @@ app.use('/api/export', exportRouter);
 app.use('/api/simulate', simulateRouter);
 app.use('/api/data', dataRouter);
 app.use('/api/upload', uploadRouter(upload));
+app.use('/api/vision', visionRouter(upload));
 
 app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   const message = error instanceof Error ? error.message : 'Bilinmeyen hata';
@@ -46,4 +66,5 @@ app.use((error: unknown, _req: express.Request, res: express.Response, _next: ex
 
 app.listen(appConfig.port, () => {
   console.log(`RetailFlow API listening on :${appConfig.port}`);
+  warmUpPythonVision();
 });

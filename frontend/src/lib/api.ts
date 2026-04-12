@@ -50,6 +50,19 @@ const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL ? `${import.meta.env.VITE_API_BASE_URL}/api` : '/api',
 });
 
+function toApiError(error: unknown): Error {
+  if (axios.isAxiosError(error)) {
+    const data = error.response?.data;
+    const message =
+      (typeof data?.error === 'string' && data.error) ||
+      (typeof data?.message === 'string' && data.message) ||
+      error.message;
+    return new Error(message);
+  }
+
+  return error instanceof Error ? error : new Error('Bilinmeyen hata');
+}
+
 export async function fetchHealth(): Promise<HealthResponse> {
   const response = await api.get<HealthResponse>('/health');
   return response.data;
@@ -126,4 +139,82 @@ export interface ProductsResponse {
 export async function fetchProducts(): Promise<ProductsResponse> {
   const response = await api.get<ProductsResponse>('/products');
   return response.data;
+}
+
+export type {
+  VisionRecognizeResponse,
+  VisionStatusResponse,
+  CatalogProductPublic,
+  RecognizedProduct,
+  FoundLocation,
+} from '@retailflow/shared';
+
+export async function fetchVisionStatus(): Promise<import('@retailflow/shared').VisionStatusResponse> {
+  try {
+    const response = await api.get<import('@retailflow/shared').VisionStatusResponse>('/vision/status');
+    return response.data;
+  } catch (error) {
+    throw toApiError(error);
+  }
+}
+
+export async function fetchCatalog(): Promise<import('@retailflow/shared').CatalogProductPublic[]> {
+  try {
+    const response = await api.get<import('@retailflow/shared').CatalogProductPublic[]>('/vision/catalog');
+    return response.data;
+  } catch (error) {
+    throw toApiError(error);
+  }
+}
+
+export async function addCatalogProduct(
+  images: File[],
+  meta: { productCode: string; productName: string; color: string; description: string },
+): Promise<import('@retailflow/shared').CatalogProductPublic> {
+  try {
+    const formData = new FormData();
+    images.forEach((img) => formData.append('images', img));
+    formData.append('productCode', meta.productCode);
+    formData.append('productName', meta.productName);
+    formData.append('color', meta.color);
+    formData.append('description', meta.description);
+    const response = await api.post<import('@retailflow/shared').CatalogProductPublic>(
+      '/vision/catalog',
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
+    return response.data;
+  } catch (error) {
+    throw toApiError(error);
+  }
+}
+
+export async function deleteCatalogProduct(id: string): Promise<void> {
+  try {
+    await api.delete(`/vision/catalog/${id}`);
+  } catch (error) {
+    throw toApiError(error);
+  }
+}
+
+export function catalogImageUrl(id: string): string {
+  const base = import.meta.env.VITE_API_BASE_URL ? `${import.meta.env.VITE_API_BASE_URL}/api` : '/api';
+  return `${base}/vision/catalog/${id}/image`;
+}
+
+export async function recognizeShelf(
+  image: File,
+): Promise<import('@retailflow/shared').VisionRecognizeResponse> {
+  try {
+    const formData = new FormData();
+    formData.append('image', image);
+    const response = await api.post<import('@retailflow/shared').VisionRecognizeResponse>(
+      '/vision/recognize',
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
+    return response.data;
+  } catch (error) {
+    throw toApiError(error);
+  }
 }

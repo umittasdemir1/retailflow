@@ -6,6 +6,7 @@ import {
   ArrowLeftRight,
   Package,
   MapPin,
+  ScanSearch,
   Settings,
   Activity,
   ChevronsLeft,
@@ -14,7 +15,7 @@ import {
   X,
 } from 'lucide-react';
 
-export type ActivePage = 'dashboard' | 'upload' | 'products' | 'locations' | 'analysis' | 'results';
+export type ActivePage = 'dashboard' | 'upload' | 'products' | 'locations' | 'analysis' | 'results' | 'vision';
 
 interface NavItem {
   id: ActivePage;
@@ -29,6 +30,7 @@ const NAV: NavItem[] = [
   { id: 'locations', icon: <MapPin size={24} strokeWidth={1.7} />,          label: 'Lokasyonlar' },
   { id: 'analysis',  icon: <BarChart3 size={24} strokeWidth={1.7} />,       label: 'Analiz' },
   { id: 'results',   icon: <ArrowLeftRight size={24} strokeWidth={1.7} />,  label: 'Sonuçlar' },
+  { id: 'vision',    icon: <ScanSearch size={24} strokeWidth={1.7} />,      label: 'Görsel Arama' },
 ];
 
 interface Props {
