@@ -7,5 +7,5 @@ huggingface_hub
 transformers>=4.40.0
 albumentations
 opencv-python-headless
-numpy
+numpy<2
 Pillow

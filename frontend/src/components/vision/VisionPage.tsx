@@ -2,13 +2,14 @@ import { useRef, useEffect, useState, useCallback } from 'react';
 import {
   ScanSearch, Trash2, Upload, ImageOff,
   Loader2, AlertCircle, Package, BookImage, X, Check,
-  MapPin,
+  MapPin, Link, Search, SquarePen,
 } from 'lucide-react';
 import type { VisionRecognizeResponse, RecognizedProduct } from '@retailflow/shared';
 import {
-  useCatalog, useAddCatalogProduct, useDeleteCatalogProduct, useRecognizeShelf,
+  useCatalog, useAddCatalogProduct, useAddCatalogProductFromCdn,
+  useUpdateCatalogProduct, useDeleteCatalogProduct, useRecognizeShelf,
 } from '../../hooks/useVision';
-import { catalogImageUrl } from '../../lib/api';
+import { catalogImageUrl, searchProducts, type ProductLookupEntry, type VisionProvider } from '../../lib/api';
 import { Panel } from '../ui/Panel';
 
 /* (canvas drawing handled inline in RecognitionTab) */
@@ -41,16 +42,32 @@ interface AddFormState {
 }
 const EMPTY_FORM: AddFormState = { productCode: '', productName: '', color: '', description: '' };
 
+
 function CatalogTab() {
   const catalogQuery   = useCatalog();
   const addMutation    = useAddCatalogProduct();
+  const cdnMutation    = useAddCatalogProductFromCdn();
   const deleteMutation = useDeleteCatalogProduct();
 
+  const [mode,         setMode]         = useState<'upload' | 'cdn'>('cdn');
+  const [provider,     setProvider]     = useState<VisionProvider>('python');
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [previewUrls,  setPreviewUrls]  = useState<string[]>([]);
   const [form,         setForm]         = useState<AddFormState>(EMPTY_FORM);
   const [dragging,     setDragging]     = useState(false);
   const [deletingId,   setDeletingId]   = useState<string | null>(null);
+  const [editingId,    setEditingId]    = useState<string | null>(null);
+  const [editForm,     setEditForm]     = useState<AddFormState>(EMPTY_FORM);
+  const updateMutation = useUpdateCatalogProduct();
+  // CDN arama
+  const [searchQ,      setSearchQ]      = useState('');
+  const [results,      setResults]      = useState<ProductLookupEntry[]>([]);
+  const [searching,    setSearching]    = useState(false);
+  const [addingId,     setAddingId]     = useState<string | null>(null);
+  const [addedIds,     setAddedIds]     = useState<Set<string>>(new Set());
+  const [expandedKey,  setExpandedKey]  = useState<string | null>(null);
+  const [expandedDesc, setExpandedDesc] = useState('');
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   function handleFiles(incoming: FileList | File[]) {
@@ -79,14 +96,80 @@ function CatalogTab() {
     e.preventDefault();
     if (pendingFiles.length === 0) return;
     addMutation.mutate(
-      { images: pendingFiles, meta: form },
+      { images: pendingFiles, meta: { ...form, provider } },
       { onSuccess: () => { setPendingFiles([]); setPreviewUrls([]); setForm(EMPTY_FORM); } },
     );
+  }
+
+  function handleSearchChange(val: string) {
+    setSearchQ(val);
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    // Son virgülden sonraki kısmı aktif sorgu olarak kullan
+    const active = val.split(',').pop()?.trim() ?? '';
+    if (!active) { setResults([]); return; }
+    setSearching(true);
+    searchTimer.current = setTimeout(async () => {
+      try { setResults(await searchProducts(active)); }
+      finally { setSearching(false); }
+    }, 250);
+  }
+
+  function handleAddFromSearch(entry: ProductLookupEntry, description = '') {
+    const key = `${entry.productCode}-${entry.colorCode}`;
+    setAddingId(key);
+    setExpandedKey(null);
+    setExpandedDesc('');
+    cdnMutation.mutate(
+      { productCode: entry.productCode, colorCode: entry.colorCode,
+        productName: entry.productName, color: entry.color, description, provider },
+      {
+        onSuccess: () => { setAddedIds((s) => new Set(s).add(key)); },
+        onSettled: () => setAddingId(null),
+      }
+    );
+  }
+
+  function handleExpandEntry(key: string) {
+    if (expandedKey === key) {
+      setExpandedKey(null);
+      setExpandedDesc('');
+    } else {
+      setExpandedKey(key);
+      setExpandedDesc('');
+    }
+  }
+
+  async function handleSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    // Virgülle ayrılmış birden fazla sorgu varsa hepsini işle
+    const queries = searchQ.split(',').map((q) => q.trim()).filter(Boolean);
+    if (queries.length === 0) return;
+    for (const q of queries) {
+      const matches = await searchProducts(q);
+      if (matches.length > 0) handleAddFromSearch(matches[0]);
+    }
+    setSearchQ('');
+    setResults([]);
   }
 
   function handleDelete(id: string) {
     setDeletingId(id);
     deleteMutation.mutate(id, { onSettled: () => setDeletingId(null) });
+  }
+
+  function startEdit(p: import('@retailflow/shared').CatalogProductPublic) {
+    setEditingId(p.id);
+    setEditForm({ productCode: p.productCode, productName: p.productName, color: p.color, description: p.description });
+  }
+
+  function cancelEdit() { setEditingId(null); setEditForm(EMPTY_FORM); }
+
+  function saveEdit(id: string) {
+    updateMutation.mutate(
+      { id, meta: editForm },
+      { onSuccess: () => { setEditingId(null); setEditForm(EMPTY_FORM); } },
+    );
   }
 
   const catalog = catalogQuery.data ?? [];
@@ -96,7 +179,131 @@ function CatalogTab() {
 
       {/* Add product */}
       <div className="vsn-catalog-left">
-        <Panel title="Referans Ürün Ekle" subtitle="Görseli yükle, bilgileri doldur, kaydet.">
+        <Panel title="Referans Ürün Ekle" subtitle={mode === 'cdn' ? 'Ürün kodu + renk kodu gir, CDN\'den otomatik çek.' : 'Görseli yükle, bilgileri doldur, kaydet.'}>
+
+          {/* Provider seçimi (Vektör Üretimi) */}
+          <div className="vsn-mode-tabs" style={{ marginBottom: 16 }}>
+            <button type="button"
+              className={`vsn-mode-tab${provider === 'python' ? ' vsn-mode-tab--active' : ''}`}
+              onClick={() => setProvider('python')}>
+              <Check size={12} style={{ opacity: provider === 'python' ? 1 : 0 }} /> Yerel Embedding
+            </button>
+            <button type="button"
+              className={`vsn-mode-tab${provider === 'openai' ? ' vsn-mode-tab--active' : ''}`}
+              onClick={() => setProvider('openai')}>
+              <Check size={12} style={{ opacity: provider === 'openai' ? 1 : 0 }} /> OpenAI Vision Embed
+            </button>
+          </div>
+
+          {/* Mod seçimi */}
+          <div className="vsn-mode-tabs">
+            <button type="button"
+              className={`vsn-mode-tab${mode === 'cdn' ? ' vsn-mode-tab--active' : ''}`}
+              onClick={() => setMode('cdn')}>
+              <Link size={13} /> CDN'den Getir
+            </button>
+            <button type="button"
+              className={`vsn-mode-tab${mode === 'upload' ? ' vsn-mode-tab--active' : ''}`}
+              onClick={() => setMode('upload')}>
+              <Upload size={13} /> Manuel Yükle
+            </button>
+          </div>
+
+          {/* CDN arama modu */}
+          {mode === 'cdn' && (
+            <div className="vsn-cdn-search-wrap">
+              <div className="vsn-cdn-search-box">
+                <Search size={15} className="vsn-cdn-search-icon" />
+                <input
+                  className="vsn-cdn-search-input"
+                  placeholder="BM26 BLUE DIVE, BM26 BLUEMINT ISLAND …"
+                  value={searchQ}
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                  onKeyDown={handleSearchKeyDown}
+                  autoFocus
+                />
+                {searching && <Loader2 size={14} className="vsn-spin vsn-cdn-search-loader" />}
+                {searchQ && !searching && (
+                  <button type="button" className="vsn-cdn-search-clear" onClick={() => { setSearchQ(''); setResults([]); }}>
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
+
+              {results.length > 0 && (
+                <div className="vsn-cdn-results">
+                  {results.map((entry) => {
+                    const key = `${entry.productCode}-${entry.colorCode}`;
+                    const isAdding = addingId === key;
+                    const isDone   = addedIds.has(key);
+                    const isExpanded = expandedKey === key;
+                    const alreadyInCatalog = (catalogQuery.data ?? []).some(
+                      (p) => p.productCode === entry.productCode && p.color === entry.color
+                    );
+                    const done = isDone || alreadyInCatalog;
+                    return (
+                      <div key={key} className={`vsn-cdn-result-row${isExpanded ? ' vsn-cdn-result-row--expanded' : ''}`}>
+                        <div className="vsn-cdn-result-info">
+                          <span className="vsn-cdn-result-code">{entry.productCode}</span>
+                          <span className="vsn-cdn-result-name">{entry.productName}</span>
+                          <span className="vsn-cdn-result-color">{entry.color}</span>
+                          <span className="vsn-cdn-result-meta">#{entry.colorCode}</span>
+                        </div>
+                        <button
+                          type="button"
+                          className={`vsn-cdn-add-btn${done ? ' vsn-cdn-add-btn--done' : isExpanded ? ' vsn-cdn-add-btn--active' : ''}`}
+                          disabled={isAdding || done}
+                          onClick={() => handleExpandEntry(key)}
+                        >
+                          {isAdding ? <Loader2 size={13} className="vsn-spin" />
+                            : done ? <Check size={13} />
+                            : isExpanded ? <X size={13} />
+                            : <Link size={13} />}
+                        </button>
+
+                        {isExpanded && (
+                          <div className="vsn-cdn-desc-row">
+                            <input
+                              className="vsn-input vsn-cdn-desc-input"
+                              placeholder="Açıklama (isteğe bağlı) — ör. kırmızı zemin, flamingo deseni"
+                              value={expandedDesc}
+                              onChange={(e) => setExpandedDesc(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') { e.preventDefault(); handleAddFromSearch(entry, expandedDesc); }
+                                if (e.key === 'Escape') { setExpandedKey(null); setExpandedDesc(''); }
+                              }}
+                              autoFocus
+                            />
+                            <button
+                              type="button"
+                              className="rf-primary-button vsn-cdn-confirm-btn"
+                              disabled={isAdding}
+                              onClick={() => handleAddFromSearch(entry, expandedDesc)}
+                            >
+                              {isAdding ? <Loader2 size={13} className="vsn-spin" /> : <Check size={13} />}
+                              Ekle
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {!searchQ && (
+                <p className="vsn-cdn-hint">
+                  Enter → ilk sonucu ekle &nbsp;·&nbsp; Virgülle ayır: <code>BM26 BLUE DIVE, BM26 BLUEMINT ISLAND</code>
+                </p>
+              )}
+              {searchQ && !searching && results.length === 0 && (
+                <p className="vsn-cdn-no-result">Sonuç bulunamadı — "{searchQ}"</p>
+              )}
+            </div>
+          )}
+
+          {/* Manuel yükleme modu */}
+          {mode === 'upload' && (<>
           <div
             className={`vsn-upload vsn-upload--compact${dragging ? ' vsn-upload--drag' : ''}`}
             onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
@@ -119,7 +326,6 @@ function CatalogTab() {
 
           {pendingFiles.length > 0 && (
             <form onSubmit={handleSubmit} className="vsn-add-form">
-              {/* Seçili görsel küçük resimleri */}
               <div className="vsn-multi-preview">
                 {previewUrls.map((url, i) => (
                   <div key={i} className="vsn-multi-thumb-wrap">
@@ -166,6 +372,7 @@ function CatalogTab() {
               </div>
             </form>
           )}
+          </>)}
         </Panel>
       </div>
 
@@ -185,19 +392,54 @@ function CatalogTab() {
           {catalog.length > 0 && (
             <div className="vsn-catalog-grid">
               {catalog.map((p) => (
-                <div key={p.id} className="vsn-catalog-card">
-                  <img src={catalogImageUrl(p.id)} alt={p.productName} className="vsn-catalog-thumb"
-                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                  <div className="vsn-catalog-info">
-                    <span className="vsn-catalog-code">{p.productCode}</span>
-                    <span className="vsn-catalog-name">{p.productName}</span>
-                    {p.color && <span className="vsn-catalog-meta">{p.color}</span>}
-                    {p.description && <span className="vsn-catalog-desc">{p.description}</span>}
-                  </div>
-                  <button type="button" className="vsn-catalog-delete"
-                    disabled={deletingId === p.id} onClick={() => handleDelete(p.id)} title="Sil">
-                    {deletingId === p.id ? <Loader2 size={14} className="vsn-spin" /> : <Trash2 size={14} />}
-                  </button>
+                <div key={p.id} className={`vsn-catalog-card${editingId === p.id ? ' vsn-catalog-card--editing' : ''}`}>
+                  {editingId === p.id ? (
+                    <div className="vsn-catalog-edit-form">
+                      <input className="vsn-input vsn-catalog-edit-input" placeholder="Ürün Kodu *"
+                        value={editForm.productCode}
+                        onChange={(e) => setEditForm((f) => ({ ...f, productCode: e.target.value }))} />
+                      <input className="vsn-input vsn-catalog-edit-input" placeholder="Ürün Adı *"
+                        value={editForm.productName}
+                        onChange={(e) => setEditForm((f) => ({ ...f, productName: e.target.value }))} />
+                      <input className="vsn-input vsn-catalog-edit-input" placeholder="Renk"
+                        value={editForm.color}
+                        onChange={(e) => setEditForm((f) => ({ ...f, color: e.target.value }))} />
+                      <input className="vsn-input vsn-catalog-edit-input" placeholder="Açıklama"
+                        value={editForm.description}
+                        onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))} />
+                      <div className="vsn-catalog-edit-actions">
+                        <button type="button" className="rf-secondary-button vsn-catalog-edit-btn" onClick={cancelEdit}>
+                          <X size={13} /> İptal
+                        </button>
+                        <button type="button" className="rf-primary-button vsn-catalog-edit-btn"
+                          disabled={updateMutation.isPending || !editForm.productCode || !editForm.productName}
+                          onClick={() => saveEdit(p.id)}>
+                          {updateMutation.isPending ? <Loader2 size={13} className="vsn-spin" /> : <Check size={13} />}
+                          Kaydet
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <img src={catalogImageUrl(p.id)} alt={p.productName} className="vsn-catalog-thumb"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                      <div className="vsn-catalog-info">
+                        <span className="vsn-catalog-code">{p.productCode}</span>
+                        <span className="vsn-catalog-name">{p.productName}</span>
+                        {p.color && <span className="vsn-catalog-meta">{p.color}</span>}
+                        {p.description && <span className="vsn-catalog-desc">{p.description}</span>}
+                      </div>
+                      <div className="vsn-catalog-actions">
+                        <button type="button" className="vsn-catalog-edit" onClick={() => startEdit(p)} title="Düzenle">
+                          <SquarePen size={14} />
+                        </button>
+                        <button type="button" className="vsn-catalog-delete"
+                          disabled={deletingId === p.id} onClick={() => handleDelete(p.id)} title="Sil">
+                          {deletingId === p.id ? <Loader2 size={14} className="vsn-spin" /> : <Trash2 size={14} />}
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
               ))}
             </div>
@@ -289,58 +531,26 @@ function RecognitionTab() {
   const catalogQuery = useCatalog();
   const recognizeMut = useRecognizeShelf();
 
-  const [previewSrc,       setPreviewSrc]       = useState<string | null>(null);
-  const [result,           setResult]           = useState<VisionRecognizeResponse | null>(null);
-  const [activeProductId,  setActiveProductId]  = useState<string | null>(null);
-  const [dragging,         setDragging]         = useState(false);
-  // Display scale: canvas natural size → CSS displayed size
-  const [scale, setScale] = useState({ x: 1, y: 1 });
+  const [previewSrc,      setPreviewSrc]      = useState<string | null>(null);
+  const [result,          setResult]          = useState<VisionRecognizeResponse | null>(null);
+  const [activeProductId, setActiveProductId] = useState<string | null>(null);
+  const [provider,        setProvider]        = useState<VisionProvider>('python');
+  const [dragging,        setDragging]        = useState(false);
+  // Doğal görsel boyutları — SVG viewBox için (canvas yok artık)
+  const [imgDims, setImgDims] = useState<{ w: number; h: number } | null>(null);
 
-  const canvasRef    = useRef<HTMLCanvasElement>(null);
-  const wrapRef      = useRef<HTMLDivElement>(null);
-  const imgRef       = useRef<HTMLImageElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Track displayed canvas size for dot positioning
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const observer = new ResizeObserver(() => {
-      setScale({
-        x: canvas.offsetWidth  / (canvas.width  || 1),
-        y: canvas.offsetHeight / (canvas.height || 1),
-      });
-    });
-    observer.observe(canvas);
-    return () => observer.disconnect();
-  }, [result]); // re-attach when result changes (canvas resizes on new image)
-
-  const redraw = useCallback(() => {
-    if (!canvasRef.current || !imgRef.current || !result) return;
-    // Just draw the image — dots are rendered as React overlay
-    const ctx = canvasRef.current.getContext('2d');
-    if (!ctx) return;
-    canvasRef.current.width  = imgRef.current.naturalWidth;
-    canvasRef.current.height = imgRef.current.naturalHeight;
-    ctx.drawImage(imgRef.current, 0, 0);
-    // Update scale after redraw
-    setScale({
-      x: canvasRef.current.offsetWidth  / (canvasRef.current.width  || 1),
-      y: canvasRef.current.offsetHeight / (canvasRef.current.height || 1),
-    });
-  }, [result]);
-
-  useEffect(() => { redraw(); }, [redraw]);
 
   function handleFile(file: File) {
     if (!file.type.startsWith('image/')) return;
-    setResult(null); setActiveProductId(null);
+    setResult(null); setActiveProductId(null); setImgDims(null);
     const url = URL.createObjectURL(file);
     setPreviewSrc(url);
+    // Doğal boyutları oku — SVG viewBox için
     const img = new Image();
-    img.onload = () => { imgRef.current = img; };
+    img.onload = () => setImgDims({ w: img.naturalWidth, h: img.naturalHeight });
     img.src = url;
-    recognizeMut.mutate(file, {
+    recognizeMut.mutate({ image: file, provider }, {
       onSuccess: (data) => {
         setResult(data);
         const first = data.recognizedProducts.find((p) => p.found);
@@ -359,6 +569,25 @@ function RecognitionTab() {
       {/* Left: photo + canvas */}
       <div className="vsn-left">
         <Panel title="Raf Fotoğrafı" subtitle="Toplu görseli yükle — katalogdaki ürünler aranır.">
+          <div className="vsn-mode-tabs" style={{ marginBottom: 12 }}>
+            <button
+              type="button"
+              className={`vsn-mode-tab${provider === 'python' ? ' vsn-mode-tab--active' : ''}`}
+              onClick={() => setProvider('python')}
+              disabled={isPending}
+            >
+              Yerel AI
+            </button>
+            <button
+              type="button"
+              className={`vsn-mode-tab${provider === 'openai' ? ' vsn-mode-tab--active' : ''}`}
+              onClick={() => setProvider('openai')}
+              disabled={isPending}
+            >
+              OpenAI Vision
+            </button>
+          </div>
+
           {!previewSrc ? (
             catalog.length === 0 ? (
               <div className="vsn-empty" style={{ minHeight: 160 }}>
@@ -377,44 +606,57 @@ function RecognitionTab() {
               >
                 <Upload size={30} strokeWidth={1.4} className="vsn-upload-icon" />
                 <p className="vsn-upload-text">Raf fotoğrafını sürükle veya tıkla</p>
-                <p className="vsn-upload-hint">{catalog.length} referans ürün · JPEG, PNG, WebP</p>
+                <p className="vsn-upload-hint">{catalog.length} referans ürün · {provider === 'openai' ? 'OpenAI Vision' : 'Yerel AI'} · JPEG, PNG, WebP</p>
                 <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp"
                   style={{ display: 'none' }}
                   onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ''; }} />
               </div>
             )
           ) : (
-            <div className="vsn-canvas-wrap" ref={wrapRef}>
-              <canvas ref={canvasRef} className="vsn-canvas" />
+            <div className="vsn-canvas-wrap">
+              {/* <img> görseli doğal boyutunda render eder — height: auto garantili */}
+              <img
+                src={previewSrc!}
+                className="vsn-shelf-img"
+                alt=""
+                onLoad={(e) => {
+                  const img = e.currentTarget;
+                  setImgDims({ w: img.naturalWidth, h: img.naturalHeight });
+                }}
+              />
 
-              {/* Blinking dot overlay — one dot per found location of active product */}
-              {result && !isPending && (() => {
+              {/* SVG overlay: inset:0 → <img> ile birebir aynı alan.
+                  viewBox = API koordinat uzayı → scale hesabı sıfır. */}
+              {result && !isPending && imgDims && (() => {
                 const dotsProduct = activeProductId
                   ? result.recognizedProducts.find((p) => p.catalogProductId === activeProductId)
                   : result.recognizedProducts.find((p) => p.found);
                 if (!dotsProduct?.found) return null;
+                const r = Math.round(Math.min(result.imageWidth, result.imageHeight) * 0.022);
                 return (
-                  <div className="vsn-dot-overlay" aria-hidden>
+                  <svg
+                    className="vsn-dot-svg"
+                    viewBox={`0 0 ${result.imageWidth} ${result.imageHeight}`}
+                    aria-hidden
+                  >
                     {dotsProduct.foundAt.map((loc, i) => {
-                      const cx = (loc.boundingBox.x + loc.boundingBox.width  / 2) * scale.x;
-                      const cy = (loc.boundingBox.y + loc.boundingBox.height / 2) * scale.y;
+                      const cx = loc.boundingBox.x + loc.boundingBox.width  / 2;
+                      const cy = loc.boundingBox.y + loc.boundingBox.height / 2;
                       return (
-                        <span
-                          key={i}
-                          className="vsn-pulse-dot"
-                          style={{ left: cx, top: cy }}
-                          title={`%${loc.confidence}`}
-                        />
+                        <g key={i}>
+                          <circle className="vsn-svg-ring" cx={cx} cy={cy} r={r} />
+                          <circle className="vsn-svg-dot"  cx={cx} cy={cy} r={r * 0.45} />
+                        </g>
                       );
                     })}
-                  </div>
+                  </svg>
                 );
               })()}
 
               {isPending && (
                 <div className="vsn-canvas-overlay">
                   <Loader2 size={30} className="vsn-spin" />
-                  <span>Ürünler aranıyor…</span>
+                  <span>{provider === 'openai' ? 'OpenAI Vision analiz ediyor…' : 'Ürünler aranıyor…'}</span>
                 </div>
               )}
             </div>
@@ -422,7 +664,7 @@ function RecognitionTab() {
 
           {previewSrc && !isPending && (
             <button type="button" className="rf-secondary-button vsn-new-photo-btn"
-              onClick={() => { setPreviewSrc(null); setResult(null); setActiveProductId(null); imgRef.current = null; }}>
+              onClick={() => { setPreviewSrc(null); setResult(null); setActiveProductId(null); setImgDims(null); }}>
               Yeni Fotoğraf Yükle
             </button>
           )}
@@ -467,7 +709,7 @@ function RecognitionTab() {
           {isPending && (
             <div className="vsn-empty">
               <Loader2 size={30} className="vsn-spin vsn-empty-icon" />
-              <p>Analiz ediliyor…</p>
+              <p>{provider === 'openai' ? 'OpenAI Vision analiz ediyor…' : 'Analiz ediliyor…'}</p>
             </div>
           )}
           {recognizeMut.isError && (
@@ -545,8 +787,8 @@ export function VisionPage() {
         </button>
       </div>
 
-      {tab === 'catalog'   && <CatalogTab />}
-      {tab === 'recognize' && <RecognitionTab />}
+      <div style={{ display: tab === 'catalog'   ? 'block' : 'none' }}><CatalogTab /></div>
+      <div style={{ display: tab === 'recognize' ? 'block' : 'none' }}><RecognitionTab /></div>
     </div>
   );
 }

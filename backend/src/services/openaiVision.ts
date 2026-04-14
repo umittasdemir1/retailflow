@@ -1,0 +1,431 @@
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import sharp from 'sharp';
+import { appConfig } from '../config.js';
+import type { CatalogProduct } from '../store/catalogStore.js';
+import type { PythonRecognizeResponse } from './pythonVision.js';
+
+interface OpenAIMatchBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  confidence: number;
+}
+
+interface OpenAIMatch {
+  catalogIndex: number;
+  found: boolean;
+  boxes: OpenAIMatchBox[];
+}
+
+interface OpenAIRecognitionPayload {
+  matches: OpenAIMatch[];
+}
+
+function clampInt(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) return min;
+  return Math.min(max, Math.max(min, Math.round(value)));
+}
+
+function iou(a: OpenAIMatchBox, b: OpenAIMatchBox): number {
+  const x1 = Math.max(a.x, b.x);
+  const y1 = Math.max(a.y, b.y);
+  const x2 = Math.min(a.x + a.width, b.x + b.width);
+  const y2 = Math.min(a.y + a.height, b.y + b.height);
+  const intersection = Math.max(0, x2 - x1) * Math.max(0, y2 - y1);
+  if (intersection <= 0) return 0;
+  const union = a.width * a.height + b.width * b.height - intersection;
+  return union > 0 ? intersection / union : 0;
+}
+
+function dedupeBoxes(boxes: OpenAIMatchBox[]): OpenAIMatchBox[] {
+  const ordered = [...boxes].sort((a, b) => b.confidence - a.confidence);
+  const selected: OpenAIMatchBox[] = [];
+  for (const box of ordered) {
+    if (selected.some((existing) => iou(existing, box) >= 0.55)) continue;
+    selected.push(box);
+  }
+  return selected;
+}
+
+async function encodeImageAsDataUrl(filePath: string, maxDimension: number): Promise<{ dataUrl: string; width: number; height: number }> {
+  let pipeline = sharp(filePath, { limitInputPixels: false }).rotate();
+  if (maxDimension > 0) {
+    pipeline = pipeline.resize({
+      width: maxDimension,
+      height: maxDimension,
+      fit: 'inside',
+      withoutEnlargement: true,
+    });
+  }
+
+  const { data, info } = await pipeline
+    .jpeg({ quality: 88, mozjpeg: true })
+    .toBuffer({ resolveWithObject: true });
+
+  return {
+    dataUrl: `data:image/jpeg;base64,${data.toString('base64')}`,
+    width: info.width,
+    height: info.height,
+  };
+}
+
+function buildSchema(catalogLength: number): Record<string, unknown> {
+  return {
+    type: 'object',
+    additionalProperties: false,
+    required: ['matches'],
+    properties: {
+      matches: {
+        type: 'array',
+        maxItems: catalogLength,
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['catalogIndex', 'found', 'boxes'],
+          properties: {
+            catalogIndex: {
+              type: 'integer',
+              enum: Array.from({ length: catalogLength }, (_, index) => index + 1),
+            },
+            found: { type: 'boolean' },
+            boxes: {
+              type: 'array',
+              maxItems: 3,
+              items: {
+                type: 'object',
+                additionalProperties: false,
+                required: ['x', 'y', 'width', 'height', 'confidence'],
+                properties: {
+                  x: { type: 'integer' },
+                  y: { type: 'integer' },
+                  width: { type: 'integer' },
+                  height: { type: 'integer' },
+                  confidence: { type: 'integer', minimum: 0, maximum: 100 },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  };
+}
+
+function buildInstructions(width: number, height: number, catalog: CatalogProduct[]): string {
+  const lines = catalog.map((item, index) => {
+    const color = item.color?.trim() || 'unspecified';
+    const desc = item.description?.trim();
+    return `- Item ${index + 1}: code=${item.productCode}; name="${item.productName}"; dominant color="${color}"${desc ? `; notes="${desc}"` : ''}`;
+  });
+
+  return [
+    'You are a retail shelf analyst. Your task: find which catalog products appear in a shelf photo.',
+    '',
+    `Shelf image: width=${width}px, height=${height}px. The FIRST image sent is the shelf photo.`,
+    'After the shelf image, reference photos follow — grouped by catalog item number.',
+    '',
+    'RULES:',
+    '1. Dominant background/fabric color MUST match. A blue garment cannot match a red one.',
+    '2. Pattern type MUST match (stripes, animals, geometric, plain, etc.).',
+    '3. Products may appear folded or stacked — match the visible portion of the print.',
+    '4. If confidence < 45%, set found=false.',
+    '5. Bounding boxes must be pixel-tight around the garment, not the whole shelf section.',
+    '6. Return at most 3 boxes per item (the clearest visible instances).',
+    '7. Return JSON only, exactly matching the schema.',
+    '',
+    'CATALOG:',
+    ...lines,
+  ].join('\n');
+}
+
+function extractOutputText(responseJson: Record<string, unknown>): string {
+  const output = Array.isArray(responseJson.output) ? responseJson.output : [];
+  const parts: string[] = [];
+  for (const item of output) {
+    if (!item || typeof item !== 'object') continue;
+    const content = Array.isArray((item).content) ? (item).content : [];
+    for (const part of content) {
+      if (!part || typeof part !== 'object') continue;
+      if ((part).type === 'output_text' && typeof (part).text === 'string') {
+        parts.push((part).text);
+      }
+    }
+  }
+  return parts.join('').trim();
+}
+
+export async function recognizeWithOpenAI(
+  imagePath: string,
+  catalog: CatalogProduct[],
+): Promise<PythonRecognizeResponse> {
+  if (!appConfig.openAIApiKey) {
+    throw new Error('OPENAI_API_KEY tanımlı değil. backend/.env içine ekleyin.');
+  }
+  if (catalog.length === 0) {
+    throw new Error('OpenAI vision için katalog boş olamaz.');
+  }
+  if (catalog.length > appConfig.openAIVisionMaxCatalogItems) {
+    throw new Error(
+      `Katalog sınırı aşıldı (${catalog.length} > ${appConfig.openAIVisionMaxCatalogItems}). OPENAI_VISION_MAX_CATALOG_ITEMS değerini .env içinde artırın.`,
+    );
+  }
+
+  const started = Date.now();
+  const shelfImage = await encodeImageAsDataUrl(imagePath, appConfig.openAIVisionShelfMaxDimension);
+
+  const content = [
+    {
+      type: 'input_text',
+      text: buildInstructions(shelfImage.width, shelfImage.height, catalog),
+    },
+    {
+      type: 'input_image',
+      image_url: shelfImage.dataUrl,
+      detail: appConfig.openAIVisionDetail,
+    },
+  ];
+
+  for (const [index, item] of catalog.entries()) {
+    content.push({
+      type: 'input_text',
+      text: `Catalog item ${index + 1}: code=${item.productCode}; name=${item.productName}; color=${item.color || 'unspecified'}; description=${item.description || 'none'}`,
+    });
+
+    const referenceNames = item.imageNames.slice(0, appConfig.openAIVisionReferenceImagesPerProduct);
+    for (const imageName of referenceNames) {
+      const referencePath = path.join(process.cwd(), 'catalog', imageName);
+      const referenceImage = await encodeImageAsDataUrl(referencePath, appConfig.openAIVisionReferenceMaxDimension);
+      content.push({
+        type: 'input_image',
+        image_url: referenceImage.dataUrl,
+        detail: 'high',
+      });
+    }
+  }
+
+  // Sadece o-serisi modeller (o1, o3, o4-mini vb.) reasoning parametresi destekler
+  const isReasoningModel = /^o\d/i.test(appConfig.openAIVisionModel);
+
+  const requestBody: Record<string, unknown> = {
+    model: appConfig.openAIVisionModel,
+    store: false,
+    input: [{ role: 'user', content }],
+    max_output_tokens: appConfig.openAIVisionMaxOutputTokens,
+    text: {
+      format: {
+        type: 'json_schema',
+        name: 'retail_shelf_matches',
+        strict: true,
+        schema: buildSchema(catalog.length),
+      },
+    },
+  };
+
+  if (isReasoningModel && appConfig.openAIVisionReasoningEffort) {
+    requestBody.reasoning = { effort: appConfig.openAIVisionReasoningEffort };
+  }
+
+  const response = await fetch('https://api.openai.com/v1/responses', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${appConfig.openAIApiKey}`,
+    },
+    body: JSON.stringify(requestBody),
+  });
+
+  const rawText = await response.text();
+  let responseJson: Record<string, unknown>;
+  try {
+    responseJson = JSON.parse(rawText) as Record<string, unknown>;
+  } catch {
+    throw new Error('OpenAI vision yanıtı JSON olarak çözülemedi.');
+  }
+
+  if (!response.ok) {
+    const apiError = responseJson.error as { message?: string } | undefined;
+    const message = apiError?.message || 'OpenAI vision isteği başarısız oldu.';
+    throw new Error(message);
+  }
+
+  // Yanıt durumunu kontrol et
+  const responseStatus = responseJson.status as string | undefined;
+  if (responseStatus && responseStatus !== 'completed') {
+    console.error(`[OPENAI] Yanıt durumu: ${responseStatus}`, JSON.stringify(responseJson).slice(0, 500));
+    throw new Error(`OpenAI vision tamamlanamadı (status: ${responseStatus}). Token limiti artırılabilir.`);
+  }
+
+  let outputText = extractOutputText(responseJson);
+
+  // Fallback: chat completions formatı (choices[].message.content)
+  if (!outputText) {
+    const choices = Array.isArray(responseJson.choices) ? responseJson.choices : [];
+    for (const choice of choices) {
+      const content = (choice as Record<string, unknown>)?.message as Record<string, unknown> | undefined;
+      if (typeof content?.content === 'string') {
+        outputText = content.content.trim();
+        break;
+      }
+    }
+  }
+
+  if (!outputText) {
+    // Debug için yanıt yapısını logla (içerik olmadan)
+    const debugKeys = JSON.stringify(Object.keys(responseJson));
+    const outputArr = Array.isArray(responseJson.output) ? responseJson.output : [];
+    console.error(`[OPENAI] Boş yanıt — üst anahtarlar: ${debugKeys}, output uzunluğu: ${outputArr.length}`);
+    if (outputArr.length > 0) {
+      console.error(`[OPENAI] İlk output item türü:`, JSON.stringify(outputArr[0]).slice(0, 300));
+    }
+    throw new Error('OpenAI vision boş yanıt döndürdü. Model adını ve token limitini kontrol edin.');
+  }
+
+  let parsed: OpenAIRecognitionPayload;
+  try {
+    parsed = JSON.parse(outputText) as OpenAIRecognitionPayload;
+  } catch {
+    throw new Error('OpenAI vision yapılandırılmış JSON üretmedi.');
+  }
+
+  const matchMap = new Map<number, OpenAIMatch>();
+  for (const match of parsed.matches ?? []) {
+    if (!Number.isInteger(match.catalogIndex)) continue;
+    if (match.catalogIndex < 1 || match.catalogIndex > catalog.length) continue;
+    const current = matchMap.get(match.catalogIndex) ?? {
+      catalogIndex: match.catalogIndex,
+      found: false,
+      boxes: [],
+    };
+    current.found = current.found || match.found;
+    current.boxes.push(...(match.boxes ?? []));
+    matchMap.set(match.catalogIndex, current);
+  }
+
+  // Performance log: tüm ürünlerin sonuçlarını göster
+  console.log('[OPENAI] ── Tanıma özeti ──────────────────────────────');
+  for (let i = 0; i < catalog.length; i++) {
+    const item = catalog[i];
+    const match = matchMap.get(i + 1);
+    if (!match) {
+      console.log(`[OPENAI]  ${i + 1}. ${item.productCode} "${item.productName}" → MODEL SONUÇ DÖNDÜRMEDI`);
+    } else if (!match.found) {
+      const maxConf = match.boxes.length > 0 ? Math.max(...match.boxes.map((b) => b.confidence)) : 0;
+      console.log(`[OPENAI]  ${i + 1}. ${item.productCode} "${item.productName}" → BULUNAMADI (en yüksek güven: ${maxConf}%)`);
+    } else {
+      const confs = match.boxes.map((b) => b.confidence).join(', ');
+      console.log(`[OPENAI]  ${i + 1}. ${item.productCode} "${item.productName}" → BULUNDU (güven: ${confs}%)`);
+    }
+  }
+  console.log('[OPENAI] ─────────────────────────────────────────────');
+
+  const detections: PythonRecognizeResponse['detections'] = [];
+  for (const [catalogIndex, match] of matchMap.entries()) {
+    if (!match.found) continue;
+    const item = catalog[catalogIndex - 1];
+    const boxes = dedupeBoxes(match.boxes).slice(0, 3);
+    for (const box of boxes) {
+      const x = clampInt(box.x, 0, Math.max(0, shelfImage.width - 1));
+      const y = clampInt(box.y, 0, Math.max(0, shelfImage.height - 1));
+      const width = clampInt(box.width, 1, Math.max(1, shelfImage.width - x));
+      const height = clampInt(box.height, 1, Math.max(1, shelfImage.height - y));
+      const confidence = clampInt(box.confidence, 0, 100);
+      detections.push({
+        catalogProductId: item.id,
+        productCode: item.productCode,
+        productName: item.productName,
+        color: item.color,
+        description: item.description,
+        confidence,
+        boundingBox: { x, y, width, height },
+        detectorConfidence: confidence / 100,
+        detectorClass: 'openai-vision',
+        margin: confidence / 100,
+        topMatches: [{
+          catalogProductId: item.id,
+          productCode: item.productCode,
+          productName: item.productName,
+          score: confidence / 100,
+        }],
+      });
+    }
+  }
+
+  return {
+    imageWidth: shelfImage.width,
+    imageHeight: shelfImage.height,
+    processingTimeMs: Date.now() - started,
+    scannedRegions: detections.length,
+    modelVersion: `openai:${appConfig.openAIVisionModel}:${appConfig.openAIVisionDetail}`,
+    detections,
+  };
+}
+
+/**
+ * OpenAI Vision ile görseli analiz edip (betimleyip) sonra metin embedding'ine çevirerek
+ * katalog ürünü için özellik vektörü üretir.
+ */
+export async function embedCatalogImagesWithOpenAI(
+  imagePaths: string[],
+): Promise<{ featureVector: number[]; featureVectors: number[][] }> {
+  if (!appConfig.openAIApiKey) {
+    throw new Error('OPENAI_API_KEY tanımlı değil. backend/.env içine ekleyin.');
+  }
+
+  const featureVectors: number[][] = [];
+  for (const imgPath of imagePaths) {
+    // 1. Görseli Vision ile betimle
+    const shelfImage = await encodeImageAsDataUrl(imgPath, 768);
+    const visionResponse = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${appConfig.openAIApiKey}`,
+      },
+      body: JSON.stringify({
+        model: appConfig.openAIVisionModel,
+        input: [{
+          role: 'user',
+          content: [
+            { type: 'input_text', text: 'Describe this retail product in detail: focus on color, pattern, fabric type, and specific visual features. Be concise.' },
+            { type: 'input_image', image_url: shelfImage.dataUrl, detail: 'low' },
+          ],
+        }],
+        max_output_tokens: 200,
+      }),
+    });
+
+    const visionResult = (await visionResponse.json()) as Record<string, unknown>;
+    const description = extractOutputText(visionResult) || 'retail product';
+
+    // 2. Betimlemeyi vektöre çevir
+    const embedResponse = await fetch('https://api.openai.com/v1/embeddings', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${appConfig.openAIApiKey}`,
+      },
+      body: JSON.stringify({
+        input: description,
+        model: 'text-embedding-3-small',
+        dimensions: 512, // Yerel pipeline ile uyumlu olması için (genelde 512 veya 1024)
+      }),
+    });
+
+    const embedResult = (await embedResponse.json()) as { data: Array<{ embedding: number[] }> };
+    if (embedResult.data?.[0]?.embedding) {
+      featureVectors.push(embedResult.data[0].embedding);
+    } else {
+      // Fallback: 512 boyutlu boş vektör
+      featureVectors.push(new Array(512).fill(0));
+    }
+  }
+
+  // Ortalama vektör hesapla
+  const featureVector = featureVectors[0].map((_, i) =>
+    featureVectors.reduce((sum, v) => sum + v[i], 0) / featureVectors.length
+  );
+
+  return { featureVector, featureVectors };
+}

@@ -141,24 +141,38 @@ export async function getPythonVisionStatus(): Promise<VisionStatusResponse> {
   return runPythonCommand<VisionStatusResponse>('status', {});
 }
 
-export async function embedCatalogImages(imagePaths: string[]): Promise<number[]> {
-  const response = await runPythonCommand<{ featureVector: number[] }>('embed', { imagePaths });
-  return response.featureVector;
+export async function embedCatalogImages(imagePaths: string[], description = ''): Promise<{ featureVector: number[]; featureVectors: number[][] }> {
+  const response = await runPythonCommand<{ featureVector: number[]; featureVectors: number[][] }>('embed', { imagePaths, description });
+  return { featureVector: response.featureVector, featureVectors: response.featureVectors };
 }
 
 export async function recognizeWithPython(
   imagePath: string,
   catalog: CatalogProduct[],
 ): Promise<PythonRecognizeResponse> {
+  // Python tanıma sadece yerel DINOv2 embedding (808-dim) ile eklenen ürünleri kullanabilir.
+  // OpenAI text embedding (512-dim) ile eklenenler FAISS'te boyut uyuşmazlığı yaratır.
+  const pythonCatalog = catalog.filter(
+    (item) => !item.embeddingProvider || item.embeddingProvider === 'python',
+  );
+
+  if (pythonCatalog.length === 0) {
+    throw new Error(
+      'Katalogdaki tüm ürünler OpenAI embedding ile eklenmiş. ' +
+      'Yerel AI tanıma için ürünleri "Yerel Embedding" seçeneği ile yeniden ekleyin, ya da Tanıma sekmesinde "OpenAI Vision" kullanın.',
+    );
+  }
+
   return runPythonCommand<PythonRecognizeResponse>('recognize', {
     imagePath,
-    catalog: catalog.map((item) => ({
+    catalog: pythonCatalog.map((item) => ({
       id: item.id,
       productCode: item.productCode,
       productName: item.productName,
       color: item.color,
       description: item.description,
       featureVector: item.featureVector,
+      featureVectors: item.featureVectors ?? [],
     })),
   });
 }

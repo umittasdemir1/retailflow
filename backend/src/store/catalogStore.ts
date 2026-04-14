@@ -8,7 +8,9 @@ export interface CatalogProduct {
   color: string;
   description: string;
   imageNames: string[];    // filenames in backend/catalog/ (ilki primary)
-  featureVector: number[]; // visual fingerprint
+  featureVector: number[]; // visual fingerprint (average — backward compat)
+  featureVectors?: number[][]; // per-image vectors for multi-vector matching
+  embeddingProvider?: 'python' | 'openai'; // hangi pipeline ile embed edildi
   addedAt: string;
 }
 
@@ -64,6 +66,19 @@ export const catalogStore = {
 
   findById(id: string): CatalogProduct | undefined {
     return catalog.find((p) => p.id === id);
+  },
+
+  updateEmbeddings(id: string, featureVector: number[], featureVectors: number[][]): void {
+    const product = catalog.find((p) => p.id === id);
+    if (product) {
+      product.featureVector = featureVector;
+      product.featureVectors = featureVectors;
+      saveToDisk();
+    }
+  },
+
+  save(): void {
+    saveToDisk();
   },
 
   count(): number {

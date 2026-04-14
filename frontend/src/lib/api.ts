@@ -169,7 +169,7 @@ export async function fetchCatalog(): Promise<import('@retailflow/shared').Catal
 
 export async function addCatalogProduct(
   images: File[],
-  meta: { productCode: string; productName: string; color: string; description: string },
+  meta: { productCode: string; productName: string; color: string; description: string; provider?: VisionProvider },
 ): Promise<import('@retailflow/shared').CatalogProductPublic> {
   try {
     const formData = new FormData();
@@ -178,10 +178,26 @@ export async function addCatalogProduct(
     formData.append('productName', meta.productName);
     formData.append('color', meta.color);
     formData.append('description', meta.description);
+    if (meta.provider) formData.append('provider', meta.provider);
     const response = await api.post<import('@retailflow/shared').CatalogProductPublic>(
       '/vision/catalog',
       formData,
       { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
+    return response.data;
+  } catch (error) {
+    throw toApiError(error);
+  }
+}
+
+export async function updateCatalogProduct(
+  id: string,
+  meta: { productCode?: string; productName?: string; color?: string; description?: string },
+): Promise<import('@retailflow/shared').CatalogProductPublic> {
+  try {
+    const response = await api.patch<import('@retailflow/shared').CatalogProductPublic>(
+      `/vision/catalog/${id}`,
+      meta,
     );
     return response.data;
   } catch (error) {
@@ -202,12 +218,47 @@ export function catalogImageUrl(id: string): string {
   return `${base}/vision/catalog/${id}/image`;
 }
 
+export type VisionProvider = 'python' | 'openai';
+
+export interface ProductLookupEntry {
+  productCode: string;
+  productName: string;
+  colorCode: string;
+  color: string;
+}
+
+export async function searchProducts(q: string): Promise<ProductLookupEntry[]> {
+  const response = await api.get<ProductLookupEntry[]>('/vision/product-search', { params: { q } });
+  return response.data;
+}
+
+export async function addCatalogProductFromCdn(meta: {
+  productCode: string;
+  colorCode: string;
+  productName: string;
+  color: string;
+  description: string;
+  provider?: VisionProvider;
+}): Promise<import('@retailflow/shared').CatalogProductPublic> {
+  try {
+    const response = await api.post<import('@retailflow/shared').CatalogProductPublic>(
+      '/vision/catalog/cdn',
+      meta,
+    );
+    return response.data;
+  } catch (error) {
+    throw toApiError(error);
+  }
+}
+
 export async function recognizeShelf(
   image: File,
+  provider: VisionProvider,
 ): Promise<import('@retailflow/shared').VisionRecognizeResponse> {
   try {
     const formData = new FormData();
     formData.append('image', image);
+    formData.append('provider', provider);
     const response = await api.post<import('@retailflow/shared').VisionRecognizeResponse>(
       '/vision/recognize',
       formData,

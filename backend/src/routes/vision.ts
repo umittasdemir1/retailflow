@@ -1,9 +1,11 @@
 import path from 'node:path';
 import fs from 'node:fs';
+import { writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { Router } from 'express';
 import type multer from 'multer';
 import { randomUUID } from 'node:crypto';
+import { appConfig } from '../config.js';
 import { catalogStore } from '../store/catalogStore.js';
 import {
   embedCatalogImages,
@@ -11,8 +13,50 @@ import {
   publicCatalogProduct,
   recognizeWithPython,
 } from '../services/pythonVision.js';
+import { recognizeWithOpenAI, embedCatalogImagesWithOpenAI } from '../services/openaiVision.js';
 import { sessionStore } from '../store/sessionStore.js';
 import type { VisionRecognizeResponse, RecognizedProduct } from '@retailflow/shared';
+
+const CDN_BASE = 'https://www.bluemint.com/cdn/shop/files';
+const CDN_MAX_IMAGES = 5;
+
+// Ürün lookup tablosu — Excel'den üretilmiş JSON
+interface LookupEntry { productCode: string; productName: string; colorCode: string; color: string; }
+let _lookupTable: LookupEntry[] = [];
+function getLookupTable(): LookupEntry[] {
+  if (_lookupTable.length > 0) return _lookupTable;
+  const p = path.join(process.cwd(), 'catalog', 'product-lookup.json');
+  if (!fs.existsSync(p)) return [];
+  try { _lookupTable = JSON.parse(fs.readFileSync(p, 'utf-8')); } catch { /* ignore */ }
+  return _lookupTable;
+}
+
+function searchProducts(query: string): LookupEntry[] {
+  const parts = query.trim().toUpperCase().split(/\s+/);
+  return getLookupTable().filter((row) => {
+    const haystack = `${row.productCode} ${row.productName} ${row.color}`.toUpperCase();
+    return parts.every((p) => haystack.includes(p));
+  }).slice(0, 20);
+}
+
+async function fetchCdnImages(
+  productCode: string,
+  colorCode: string,
+  destDir: string,
+  id: string,
+): Promise<string[]> {
+  const saved: string[] = [];
+  for (let i = 1; i <= CDN_MAX_IMAGES; i++) {
+    const url = `${CDN_BASE}/${productCode}-${colorCode}-${i}.jpg`;
+    const res = await fetch(url);
+    if (!res.ok) break;
+    const buf = Buffer.from(await res.arrayBuffer());
+    const name = `${id}-${i - 1}.jpg`;
+    await writeFile(path.join(destDir, name), buf);
+    saved.push(name);
+  }
+  return saved;
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -29,8 +73,24 @@ function resolveCatalogDir(): string {
 
 const CATALOG_DIR = resolveCatalogDir();
 
+type VisionProvider = 'python' | 'openai';
+
+function resolveVisionProvider(rawValue: unknown): VisionProvider {
+  if (typeof rawValue === 'string' && rawValue.trim().toLowerCase() === 'openai') {
+    return 'openai';
+  }
+  return appConfig.visionProvider;
+}
+
 export function visionRouter(upload: multer.Multer): Router {
   const router = Router();
+
+  // Ürün arama — "BM26 BLUE DIVE" gibi sorguyla Excel tablosunda arama
+  router.get('/product-search', (req, res) => {
+    const q = String(req.query.q ?? '').trim();
+    if (!q) { res.json([]); return; }
+    res.json(searchProducts(q));
+  });
 
   router.get('/status', async (_req, res) => {
     try {
@@ -67,6 +127,7 @@ export function visionRouter(upload: multer.Multer): Router {
     const productName = (req.body.productName as string | undefined)?.trim() ?? '';
     const color       = (req.body.color       as string | undefined)?.trim() ?? '';
     const description = (req.body.description as string | undefined)?.trim() ?? '';
+    const provider    = resolveVisionProvider(req.body.provider);
 
     if (!productCode || !productName) {
       files.forEach((f) => fs.rmSync(f.path, { force: true }));
@@ -86,17 +147,88 @@ export function visionRouter(upload: multer.Multer): Router {
         return imgName;
       });
 
-      // Tüm referans görsellerden ortalama embedding al
-      const imagePaths    = imageNames.map((n) => path.join(CATALOG_DIR, n));
-      const featureVector = await embedCatalogImages(imagePaths);
+      // Tüm referans görsellerden embedding al (hem ortalama hem tekil)
+      const imagePaths = imageNames.map((n) => path.join(CATALOG_DIR, n));
+      // Katalog embedding her zaman CLIP (768-dim) — provider sadece TANIMA aşamasını etkiler.
+      // Bu sayede OpenAI ile eklenen ürünler yerel AI ile de, OpenAI ile de tanınabilir.
+      const { featureVector, featureVectors } = await embedCatalogImages(imagePaths, description);
 
-      const product = { id, productCode, productName, color, description, imageNames, featureVector, addedAt: new Date().toISOString() };
+
+      const product = { id, productCode, productName, color, description, imageNames, featureVector, featureVectors, embeddingProvider: 'python' as const, addedAt: new Date().toISOString() };
       catalogStore.add(product);
       res.status(201).json(publicCatalogProduct(product));
     } catch (error) {
       files.forEach((f) => fs.rmSync(f.path, { force: true }));
       next(error);
     }
+  });
+
+  // CDN'den otomatik görsel çekip kataloga ekle
+  router.post('/catalog/cdn', async (req, res, next) => {
+    const { productCode, colorCode, productName, color, description, provider: rawProvider } = req.body as Record<string, string>;
+    if (!productCode?.trim() || !colorCode?.trim() || !productName?.trim()) {
+      res.status(400).json({ ok: false, error: 'productCode, colorCode ve productName zorunludur' });
+      return;
+    }
+    const provider = resolveVisionProvider(rawProvider);
+
+    try {
+      const id = randomUUID();
+      const imageNames = await fetchCdnImages(productCode.trim(), colorCode.trim(), CATALOG_DIR, id);
+      if (imageNames.length === 0) {
+        res.status(404).json({ ok: false, error: `CDN'de görsel bulunamadı: ${productCode}-${colorCode}-1.jpg` });
+        return;
+      }
+      const imagePaths = imageNames.map((n) => path.join(CATALOG_DIR, n));
+      // Katalog embedding her zaman CLIP (768-dim) — provider sadece TANIMA aşamasını etkiler.
+      // Bu sayede OpenAI ile eklenen ürünler yerel AI ile de, OpenAI ile de tanınabilir.
+      const { featureVector, featureVectors } = await embedCatalogImages(imagePaths, description);
+
+      const product = {
+        id, productCode: productCode.trim(), productName: productName.trim(),
+        color: color?.trim() ?? '', description: description?.trim() ?? '',
+        imageNames, featureVector, featureVectors, embeddingProvider: 'python' as const, addedAt: new Date().toISOString(),
+      };
+      catalogStore.add(product);
+      console.log(`[CATALOG] CDN'den eklendi: ${productCode} ${color} (${imageNames.length} görsel, provider=${provider})`);
+      res.status(201).json(publicCatalogProduct(product));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Ürün metadata güncelle (görsel değişmez, açıklama değişirse embedding yeniden hesaplanır)
+  router.patch('/catalog/:id', async (req, res) => {
+    const product = catalogStore.findById(req.params.id);
+    if (!product) {
+      res.status(404).json({ ok: false, error: 'Ürün bulunamadı' });
+      return;
+    }
+    const newCode        = (req.body.productCode as string | undefined)?.trim();
+    const newName        = (req.body.productName as string | undefined)?.trim();
+    const newColor       = (req.body.color       as string | undefined)?.trim() ?? product.color;
+    const newDescription = (req.body.description as string | undefined)?.trim() ?? product.description;
+    const descChanged    = newDescription !== product.description;
+
+    if (newCode) product.productCode = newCode;
+    if (newName) product.productName = newName;
+    product.color       = newColor;
+    product.description = newDescription;
+
+    // Açıklama değiştiyse yerel AI embedding'ini güncelle (metin blend yeniden hesaplanır)
+    if (descChanged && (!product.embeddingProvider || product.embeddingProvider === 'python')) {
+      try {
+        const imagePaths = product.imageNames.map((n) => path.join(CATALOG_DIR, n));
+        const { featureVector, featureVectors } = await embedCatalogImages(imagePaths, newDescription);
+        catalogStore.updateEmbeddings(product.id, featureVector, featureVectors);
+      } catch {
+        catalogStore.save();
+      }
+    } else {
+      catalogStore.save();
+    }
+
+    res.json(publicCatalogProduct(product));
   });
 
   router.delete('/catalog/:id', (req, res) => {
@@ -143,9 +275,12 @@ export function visionRouter(upload: multer.Multer): Router {
 
     try {
       const catalog = catalogStore.getAll();
-      const pythonResult = await recognizeWithPython(req.file.path, catalog);
+      const provider = resolveVisionProvider(req.body.provider);
+      const recognitionResult = provider === 'openai'
+        ? await recognizeWithOpenAI(req.file.path, catalog)
+        : await recognizeWithPython(req.file.path, catalog);
 
-      // Python detection-centric → frontend product-centric dönüşümü
+      // detection-centric → frontend product-centric dönüşümü
       const inventoryRecords = sessionStore.get().data ?? [];
 
       // Her katalog ürünü için tespitleri topla
@@ -179,7 +314,7 @@ export function visionRouter(upload: multer.Multer): Router {
       }
 
       // Python tespitlerini ürün kartlarına ekle
-      for (const det of pythonResult.detections) {
+      for (const det of recognitionResult.detections) {
         const product = productMap.get(det.catalogProductId);
         if (!product) continue;
         product.foundAt.push({ boundingBox: det.boundingBox, confidence: det.confidence });
@@ -189,26 +324,22 @@ export function visionRouter(upload: multer.Multer): Router {
         }
       }
 
-      // foundAt listelerini güvene göre sırala
       for (const product of productMap.values()) {
         product.foundAt.sort((a, b) => b.confidence - a.confidence);
       }
 
-      // Bulunanlar önce, bulunmayanlar sonra
       const recognizedProducts = [...productMap.values()].sort(
         (a, b) => Number(b.found) - Number(a.found) || b.bestConfidence - a.bestConfidence,
       );
 
-      const response: VisionRecognizeResponse = {
-        imageWidth:         pythonResult.imageWidth,
-        imageHeight:        pythonResult.imageHeight,
+      res.json({
+        imageWidth:       recognitionResult.imageWidth,
+        imageHeight:      recognitionResult.imageHeight,
         recognizedProducts,
-        scannedRegions:     pythonResult.scannedRegions,
-        processingTimeMs:   pythonResult.processingTimeMs,
-        modelVersion:       pythonResult.modelVersion,
-      };
-
-      res.json(response);
+        scannedRegions:   recognitionResult.scannedRegions,
+        processingTimeMs: recognitionResult.processingTimeMs,
+        modelVersion:     recognitionResult.modelVersion,
+      });
     } catch (error) {
       next(error);
     }

@@ -15,7 +15,8 @@ import { storesRouter } from './routes/stores.js';
 import { strategiesRouter } from './routes/strategies.js';
 import { uploadRouter } from './routes/upload.js';
 import { visionRouter } from './routes/vision.js';
-import { warmUpPythonVision } from './services/pythonVision.js';
+import { warmUpPythonVision, embedCatalogImages } from './services/pythonVision.js';
+import { catalogStore } from './store/catalogStore.js';
 
 const app = express();
 const uploadDir = path.resolve(appConfig.uploadDir);
@@ -67,4 +68,32 @@ app.use((error: unknown, _req: express.Request, res: express.Response, _next: ex
 app.listen(appConfig.port, () => {
   console.log(`RetailFlow API listening on :${appConfig.port}`);
   warmUpPythonVision();
+  reEmbedCatalogIfNeeded();
 });
+
+const CLIP_DIM = 768;
+
+async function reEmbedCatalogIfNeeded(): Promise<void> {
+  const products = catalogStore.getAll().filter((product) => {
+    if (product.featureVector.length === 0) return true;
+    // Boyut yanlışsa (eski DINOv2=808, OpenAI=1536 vb.) → CLIP ile yeniden embed et
+    if (product.featureVector.length !== CLIP_DIM) return true;
+    if (!product.featureVectors || product.featureVectors.length === 0) return true;
+    return product.featureVectors.some((v) => v.length !== CLIP_DIM);
+  });
+  if (products.length === 0) return;
+  console.log(`[CATALOG] ${products.length} ürün CLIP ile yeniden embed ediliyor...`);
+  const nodePath = await import('node:path');
+  const catalogDir = nodePath.default.join(process.cwd(), 'catalog');
+  for (const product of products) {
+    try {
+      const imagePaths = product.imageNames.map((name) => nodePath.default.join(catalogDir, name));
+      const { featureVector, featureVectors } = await embedCatalogImages(imagePaths, product.description);
+      catalogStore.updateEmbeddings(product.id, featureVector, featureVectors);
+      console.log(`[CATALOG] Re-embed OK: ${product.productCode} ${product.color}`);
+    } catch (err) {
+      console.error(`[CATALOG] Re-embed HATA: ${product.productCode}`, err);
+    }
+  }
+  console.log(`[CATALOG] Yeniden embed tamamlandı.`);
+}

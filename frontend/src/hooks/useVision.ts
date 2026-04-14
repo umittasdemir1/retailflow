@@ -3,8 +3,11 @@ import {
   fetchVisionStatus,
   fetchCatalog,
   addCatalogProduct,
+  addCatalogProductFromCdn,
+  updateCatalogProduct,
   deleteCatalogProduct,
   recognizeShelf,
+  type VisionProvider,
 } from '../lib/api';
 
 export function useVisionStatus() {
@@ -30,8 +33,33 @@ export function useAddCatalogProduct() {
       meta,
     }: {
       images: File[];
-      meta: { productCode: string; productName: string; color: string; description: string };
+      meta: { productCode: string; productName: string; color: string; description: string; provider?: VisionProvider };
     }) => addCatalogProduct(images, meta),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['visionCatalog'] });
+    },
+  });
+}
+
+export function useAddCatalogProductFromCdn() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (meta: {
+      productCode: string; colorCode: string;
+      productName: string; color: string; description: string;
+      provider?: VisionProvider;
+    }) => addCatalogProductFromCdn(meta),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['visionCatalog'] });
+    },
+  });
+}
+
+export function useUpdateCatalogProduct() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, meta }: { id: string; meta: { productCode?: string; productName?: string; color?: string; description?: string } }) =>
+      updateCatalogProduct(id, meta),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['visionCatalog'] });
     },
@@ -50,6 +78,6 @@ export function useDeleteCatalogProduct() {
 
 export function useRecognizeShelf() {
   return useMutation({
-    mutationFn: recognizeShelf,
+    mutationFn: ({ image, provider }: { image: File; provider: VisionProvider }) => recognizeShelf(image, provider),
   });
 }
