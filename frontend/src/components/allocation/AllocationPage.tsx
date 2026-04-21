@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef } from 'react';
 import { useSeries, useAllocations, useAllocationMutations, type StoreAllocation } from '../../hooks/useAllocation';
 import { useStores, useProducts } from '../../hooks/useStores';
-import { ChevronRight, ChevronDown, ToggleLeft, ToggleRight } from 'lucide-react';
+import { ChevronRight, ChevronDown, ToggleLeft, ToggleRight, ChevronsRight } from 'lucide-react';
 
 interface RowData {
   storeName: string;
@@ -16,6 +16,54 @@ function getState(row: RowData) {
     seriesId:    row.allocation?.seriesId    ?? '',
     seriesCount: row.allocation?.seriesCount ?? 1,
   };
+}
+
+function BulkSeriesCell({ rows, series, onApplyAll }: {
+  rows: RowData[];
+  series: { id: string; name: string }[];
+  onApplyAll: (seriesId: string, seriesCount: number) => void;
+}) {
+  const [sid, setSid] = useState('');
+  const [cnt, setCnt] = useState(1);
+
+  function apply() {
+    if (!sid) return;
+    onApplyAll(sid, cnt);
+    setSid('');
+    setCnt(1);
+  }
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={(e) => e.stopPropagation()}>
+      <select
+        className="rf-select"
+        style={{ fontSize: '0.8rem', minHeight: 30, padding: '0 8px', flex: 1 }}
+        value={sid}
+        onChange={(e) => setSid(e.target.value)}
+      >
+        <option value="">Tümüne seri uygula...</option>
+        {series.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+      </select>
+      <input
+        type="number"
+        min={1}
+        step={1}
+        value={cnt}
+        onChange={(e) => setCnt(Math.max(1, Number(e.target.value)))}
+        style={{ width: 48, textAlign: 'center', padding: '3px 4px', borderRadius: 5, border: '1px solid var(--line-strong)', background: 'var(--bg)', color: 'var(--ink)', fontSize: '0.83rem' }}
+      />
+      <button
+        type="button"
+        className="rf-icon-btn"
+        title={`${rows.length} renge uygula`}
+        disabled={!sid}
+        onClick={apply}
+        style={{ flexShrink: 0 }}
+      >
+        <ChevronsRight size={14} />
+      </button>
+    </div>
+  );
 }
 
 function ColorRow({ row, series, onSave }: {
@@ -214,12 +262,12 @@ export function AllocationPage() {
                 return (
                   <>
                     {/* Product header row */}
-                    <tr
-                      key={productName}
-                      style={{ background: 'var(--surface)', borderBottom: '1px solid var(--line-strong)', cursor: 'pointer' }}
-                      onClick={() => toggle(productName)}
-                    >
-                      <td style={{ ...td, fontWeight: 700, color: 'var(--ink)' }}>
+                    <tr key={productName} style={{ background: 'var(--surface)', borderBottom: '1px solid var(--line-strong)' }}>
+                      {/* Name + toggle column */}
+                      <td
+                        style={{ ...td, fontWeight: 700, color: 'var(--ink)', cursor: 'pointer', userSelect: 'none' }}
+                        onClick={() => toggle(productName)}
+                      >
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                           {isOpen
                             ? <ChevronDown size={15} style={{ color: 'var(--ink-soft)', flexShrink: 0 }} />
@@ -230,7 +278,13 @@ export function AllocationPage() {
                           </span>
                         </span>
                       </td>
-                      <td colSpan={3} />
+
+                      {/* Bulk series selector */}
+                      <td style={td}>
+                        <BulkSeriesCell rows={colorRows} series={series} onApplyAll={(sid, cnt) => colorRows.forEach((r) => saveRow(r, { ...getState(r), seriesId: sid, seriesCount: cnt }))} />
+                      </td>
+
+                      <td colSpan={2} />
                     </tr>
 
                     {/* Color rows */}
