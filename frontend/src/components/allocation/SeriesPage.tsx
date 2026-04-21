@@ -3,37 +3,79 @@ import { Panel } from '../ui/Panel';
 import { useSeries, useSeriesMutations, type Series } from '../../hooks/useAllocation';
 import { Plus, Trash2, Pencil, Check, X } from 'lucide-react';
 
-const DEFAULT_SIZES = [
-  { size: 'XS', ratio: 0 },
-  { size: 'S',  ratio: 1 },
-  { size: 'M',  ratio: 3 },
-  { size: 'L',  ratio: 3 },
-  { size: 'XL', ratio: 1 },
-  { size: 'XXL', ratio: 0 },
-];
+interface SizeRow { size: string; ratio: number; }
 
 function SizesEditor({ value, onChange }: { value: Record<string, number>; onChange: (v: Record<string, number>) => void }) {
-  const rows = DEFAULT_SIZES.map((d) => ({ size: d.size, ratio: value[d.size] ?? d.ratio }));
+  const rows: SizeRow[] = Object.entries(value).map(([size, ratio]) => ({ size, ratio }));
+  const [newSize, setNewSize] = useState('');
+  const [newRatio, setNewRatio] = useState(1);
 
-  function setRatio(size: string, ratio: number) {
+  function updateRatio(size: string, ratio: number) {
     onChange({ ...value, [size]: ratio });
   }
 
+  function removeSize(size: string) {
+    const next = { ...value };
+    delete next[size];
+    onChange(next);
+  }
+
+  function addRow() {
+    const s = newSize.trim().toUpperCase();
+    if (!s || s in value) return;
+    onChange({ ...value, [s]: newRatio });
+    setNewSize('');
+    setNewRatio(1);
+  }
+
   return (
-    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {/* Header */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px 32px', gap: 8, fontSize: '0.74rem', color: 'var(--ink-muted)', fontWeight: 600, paddingBottom: 4, borderBottom: '1px solid var(--line-strong)' }}>
+        <span>Beden</span><span style={{ textAlign: 'center' }}>Oran</span><span />
+      </div>
+
+      {/* Existing rows */}
       {rows.map(({ size, ratio }) => (
-        <label key={size} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, fontSize: '0.78rem' }}>
-          <span style={{ color: 'var(--ink-soft)', fontWeight: 600 }}>{size}</span>
+        <div key={size} style={{ display: 'grid', gridTemplateColumns: '1fr 80px 32px', gap: 8, alignItems: 'center' }}>
+          <span style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--ink)' }}>{size}</span>
           <input
             type="number"
-            min={0}
+            min={1}
             step={1}
             value={ratio}
-            onChange={(e) => setRatio(size, Number(e.target.value))}
-            style={{ width: 52, textAlign: 'center', padding: '4px 6px', borderRadius: 6, border: '1px solid var(--line-strong)', background: 'var(--surface)', color: 'var(--ink)', fontSize: '0.85rem' }}
+            onChange={(e) => updateRatio(size, Math.max(1, Number(e.target.value)))}
+            style={{ textAlign: 'center', padding: '4px 6px', borderRadius: 6, border: '1px solid var(--line-strong)', background: 'var(--surface)', color: 'var(--ink)', fontSize: '0.85rem', width: '100%' }}
           />
-        </label>
+          <button type="button" className="rf-icon-btn rf-icon-btn--danger" onClick={() => removeSize(size)} title="Sil">
+            <Trash2 size={13} />
+          </button>
+        </div>
       ))}
+
+      {/* Add new row */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px 32px', gap: 8, alignItems: 'center', marginTop: 4, paddingTop: 8, borderTop: '1px solid var(--line-strong)' }}>
+        <input
+          type="text"
+          value={newSize}
+          onChange={(e) => setNewSize(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && addRow()}
+          placeholder="Beden (S, M, 36…)"
+          style={{ padding: '5px 8px', borderRadius: 6, border: '1px solid var(--line-strong)', background: 'var(--surface)', color: 'var(--ink)', fontSize: '0.84rem', width: '100%' }}
+        />
+        <input
+          type="number"
+          min={1}
+          step={1}
+          value={newRatio}
+          onChange={(e) => setNewRatio(Math.max(1, Number(e.target.value)))}
+          onKeyDown={(e) => e.key === 'Enter' && addRow()}
+          style={{ textAlign: 'center', padding: '5px 6px', borderRadius: 6, border: '1px solid var(--line-strong)', background: 'var(--surface)', color: 'var(--ink)', fontSize: '0.85rem', width: '100%' }}
+        />
+        <button type="button" className="rf-icon-btn" onClick={addRow} title="Beden ekle">
+          <Plus size={14} />
+        </button>
+      </div>
     </div>
   );
 }
@@ -44,14 +86,11 @@ function SeriesForm({ onSave, onCancel, initial }: {
   initial?: Series;
 }) {
   const [name, setName] = useState(initial?.name ?? '');
-  const [sizes, setSizes] = useState<Record<string, number>>(
-    initial?.sizes ?? Object.fromEntries(DEFAULT_SIZES.map((d) => [d.size, d.ratio]))
-  );
+  const [sizes, setSizes] = useState<Record<string, number>>(initial?.sizes ?? {});
 
   function handleSave() {
-    const filtered = Object.fromEntries(Object.entries(sizes).filter(([, v]) => v > 0));
-    if (!name.trim() || Object.keys(filtered).length === 0) return;
-    onSave(name.trim(), filtered);
+    if (!name.trim() || Object.keys(sizes).length === 0) return;
+    onSave(name.trim(), sizes);
   }
 
   return (
