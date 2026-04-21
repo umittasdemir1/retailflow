@@ -1,21 +1,79 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useSeries, useAllocations, useAllocationMutations, type StoreAllocation } from '../../hooks/useAllocation';
 import { useStores, useProducts } from '../../hooks/useStores';
-import { ToggleLeft, ToggleRight } from 'lucide-react';
+import { ChevronRight, ChevronDown, ToggleLeft, ToggleRight } from 'lucide-react';
 
-interface TableRow {
+interface RowData {
   storeName: string;
   productName: string;
   color: string;
   allocation: StoreAllocation | null;
 }
 
-function useDebounce<T extends (...args: never[]) => void>(fn: T, ms: number): T {
-  let timer: ReturnType<typeof setTimeout>;
-  return ((...args: Parameters<T>) => {
-    clearTimeout(timer);
-    timer = setTimeout(() => fn(...args), ms);
-  }) as T;
+function getState(row: RowData) {
+  return {
+    enabled:     row.allocation?.enabled     ?? true,
+    seriesId:    row.allocation?.seriesId    ?? '',
+    seriesCount: row.allocation?.seriesCount ?? 1,
+  };
+}
+
+function ColorRow({ row, series, onSave }: {
+  row: RowData;
+  series: { id: string; name: string }[];
+  onSave: (row: RowData, patch: Partial<Omit<StoreAllocation, 'id' | 'createdAt'>>) => void;
+}) {
+  const state = getState(row);
+  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+
+  function save(patch: Partial<Omit<StoreAllocation, 'id' | 'createdAt'>>) {
+    onSave(row, { ...state, ...patch });
+  }
+
+  function handleCountChange(val: number) {
+    clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => save({ seriesCount: Math.max(1, val) }), 600);
+  }
+
+  return (
+    <tr style={{ borderBottom: '1px solid var(--line-strong)', background: state.enabled ? 'transparent' : 'var(--surface)', opacity: state.enabled ? 1 : 0.55 }}>
+      <td style={{ ...td, paddingLeft: 40, color: 'var(--ink-soft)' }}>{row.color}</td>
+
+      <td style={td}>
+        <select
+          className="rf-select"
+          style={{ fontSize: '0.8rem', minHeight: 30, padding: '0 8px' }}
+          value={state.seriesId}
+          onChange={(e) => save({ seriesId: e.target.value })}
+        >
+          <option value="">—</option>
+          {series.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+        </select>
+      </td>
+
+      <td style={{ ...td, textAlign: 'center' }}>
+        <input
+          type="number"
+          min={1}
+          step={1}
+          defaultValue={state.seriesCount}
+          key={row.allocation?.id ?? `${row.storeName}${row.productName}${row.color}`}
+          onChange={(e) => handleCountChange(Number(e.target.value))}
+          style={{ width: 56, textAlign: 'center', padding: '3px 4px', borderRadius: 5, border: '1px solid var(--line-strong)', background: 'var(--bg)', color: 'var(--ink)', fontSize: '0.83rem' }}
+        />
+      </td>
+
+      <td style={{ ...td, textAlign: 'center' }}>
+        <button
+          type="button"
+          onClick={() => save({ enabled: !state.enabled })}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: state.enabled ? 'var(--accent)' : 'var(--ink-muted)', display: 'inline-flex' }}
+        >
+          {state.enabled ? <ToggleRight size={22} /> : <ToggleLeft size={22} />}
+        </button>
+      </td>
+    </tr>
+  );
 }
 
 export function AllocationPage() {
@@ -27,79 +85,64 @@ export function AllocationPage() {
 
   const [storeFilter, setStoreFilter] = useState('');
   const [productFilter, setProductFilter] = useState('');
-  const [onlyActive, setOnlyActive] = useState(false);
+  const [onlyActive, setOnlyActive]   = useState(false);
+  const [expanded, setExpanded]       = useState<Set<string>>(new Set());
 
   const storeNames = useMemo(() => stores.map((s) => s.name).sort(), [stores]);
-  const products = productsData?.products ?? [];
+  const products   = productsData?.products ?? [];
 
-  // All product × color combinations
-  const productColors = useMemo(() => {
-    const rows: { productName: string; color: string }[] = [];
-    for (const p of products) {
-      for (const c of p.colors) {
-        rows.push({ productName: p.productName, color: c });
-      }
-    }
-    return rows;
-  }, [products]);
-
-  // Allocation lookup map: storeName|||productName|||color → StoreAllocation
   const allocMap = useMemo(() => {
     const map = new Map<string, StoreAllocation>();
-    for (const a of allocations) {
-      map.set(`${a.storeName}|||${a.productName}|||${a.color}`, a);
-    }
+    for (const a of allocations) map.set(`${a.storeName}|||${a.productName}|||${a.color}`, a);
     return map;
   }, [allocations]);
 
-  // Full matrix filtered by store + product search + onlyActive
-  const rows = useMemo((): TableRow[] => {
+  // Group by product → colors
+  const grouped = useMemo(() => {
     if (!storeFilter) return [];
     const pq = productFilter.toLowerCase();
-    return productColors
-      .filter((pc) => !pq || pc.productName.toLowerCase().includes(pq) || pc.color.toLowerCase().includes(pq))
-      .map((pc) => ({
-        storeName: storeFilter,
-        productName: pc.productName,
-        color: pc.color,
-        allocation: allocMap.get(`${storeFilter}|||${pc.productName}|||${pc.color}`) ?? null,
-      }))
-      .filter((r) => !onlyActive || r.allocation?.enabled === true);
-  }, [storeFilter, productFilter, onlyActive, productColors, allocMap]);
 
-  function getAllocationState(row: TableRow) {
-    return {
-      enabled: row.allocation?.enabled ?? false,
-      seriesId: row.allocation?.seriesId ?? '',
-      seriesCount: row.allocation?.seriesCount ?? 1,
-    };
+    const map = new Map<string, RowData[]>();
+    for (const p of products) {
+      if (pq && !p.productName.toLowerCase().includes(pq)) continue;
+      const colorRows: RowData[] = p.colors.map((c) => ({
+        storeName:   storeFilter,
+        productName: p.productName,
+        color:       c,
+        allocation:  allocMap.get(`${storeFilter}|||${p.productName}|||${c}`) ?? null,
+      }));
+      if (onlyActive && !colorRows.some((r) => getState(r).enabled)) continue;
+      map.set(p.productName, colorRows);
+    }
+    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  }, [storeFilter, productFilter, onlyActive, products, allocMap]);
+
+  function toggle(productName: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      next.has(productName) ? next.delete(productName) : next.add(productName);
+      return next;
+    });
   }
 
-  function saveRow(row: TableRow, patch: Partial<Omit<StoreAllocation, 'id' | 'createdAt'>>) {
+  function saveRow(row: RowData, patch: Partial<Omit<StoreAllocation, 'id' | 'createdAt'>>) {
     if (row.allocation) {
       update.mutate({ id: row.allocation.id, data: patch });
     } else {
       add.mutate({
-        storeName: row.storeName,
+        storeName:   row.storeName,
         productName: row.productName,
-        color: row.color,
-        seriesId: patch.seriesId ?? '',
-        seriesCount: patch.seriesCount ?? 1,
-        enabled: patch.enabled ?? false,
+        color:       row.color,
+        seriesId:    '',
+        seriesCount: 1,
+        enabled:     true,
         ...patch,
       });
     }
   }
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const debouncedSave = useCallback(
-    useDebounce((row: TableRow, patch: Partial<Omit<StoreAllocation, 'id' | 'createdAt'>>) => {
-      saveRow(row, patch);
-    }, 600),
-    [allocations],
-  );
-
-  const activeCount = rows.filter((r) => r.allocation?.enabled).length;
+  const totalActive = grouped.reduce((n, [, rows]) => n + rows.filter((r) => getState(r).enabled).length, 0);
+  const totalRows   = grouped.reduce((n, [, rows]) => n + rows.length, 0);
 
   return (
     <div className="rf-page">
@@ -109,7 +152,7 @@ export function AllocationPage() {
           <h1 className="rf-page-title">Mağaza Tahsisatları</h1>
           <p className="rf-page-subtitle">
             {storeFilter
-              ? `${rows.length} kombinasyon · ${activeCount} aktif`
+              ? `${grouped.length} model · ${totalRows} renk · ${totalActive} aktif`
               : 'Mağaza seçerek başla.'}
           </p>
         </div>
@@ -131,23 +174,19 @@ export function AllocationPage() {
           type="text"
           className="rf-text-input"
           style={{ flex: '1 1 200px' }}
-          placeholder="Ürün veya renk ara..."
+          placeholder="Model ara..."
           value={productFilter}
           onChange={(e) => setProductFilter(e.target.value)}
         />
 
         <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.83rem', color: 'var(--ink-soft)', whiteSpace: 'nowrap', cursor: 'pointer' }}>
-          <input
-            type="checkbox"
-            checked={onlyActive}
-            onChange={(e) => setOnlyActive(e.target.checked)}
-          />
+          <input type="checkbox" checked={onlyActive} onChange={(e) => setOnlyActive(e.target.checked)} />
           Sadece aktif
         </label>
       </div>
 
       {!storeFilter && (
-        <p style={{ color: 'var(--ink-muted)', fontSize: '0.85rem' }}>Tablo görüntülemek için yukarıdan mağaza seç.</p>
+        <p style={{ color: 'var(--ink-muted)', fontSize: '0.85rem' }}>Mağaza seç.</p>
       )}
 
       {storeFilter && (
@@ -155,73 +194,55 @@ export function AllocationPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.84rem' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid var(--line-strong)', textAlign: 'left' }}>
-                <th style={thStyle}>Ürün</th>
-                <th style={thStyle}>Renk</th>
-                <th style={{ ...thStyle, width: 160 }}>Seri</th>
-                <th style={{ ...thStyle, width: 80, textAlign: 'center' }}>Adet</th>
-                <th style={{ ...thStyle, width: 70, textAlign: 'center' }}>Aktif</th>
+                <th style={th}>Model / Renk</th>
+                <th style={{ ...th, width: 160 }}>Seri</th>
+                <th style={{ ...th, width: 80, textAlign: 'center' }}>Adet</th>
+                <th style={{ ...th, width: 70, textAlign: 'center' }}>Aktif</th>
               </tr>
             </thead>
             <tbody>
               {allocLoading && (
-                <tr><td colSpan={5} style={{ padding: '16px', color: 'var(--ink-muted)' }}>Yükleniyor...</td></tr>
+                <tr><td colSpan={4} style={{ padding: 16, color: 'var(--ink-muted)' }}>Yükleniyor...</td></tr>
               )}
-              {!allocLoading && rows.length === 0 && (
-                <tr><td colSpan={5} style={{ padding: '16px', color: 'var(--ink-muted)' }}>Sonuç yok.</td></tr>
+              {!allocLoading && grouped.length === 0 && (
+                <tr><td colSpan={4} style={{ padding: 16, color: 'var(--ink-muted)' }}>Sonuç yok.</td></tr>
               )}
-              {rows.map((row) => {
-                const state = getAllocationState(row);
-                const rowKey = `${row.storeName}|||${row.productName}|||${row.color}`;
+
+              {grouped.map(([productName, colorRows]) => {
+                const isOpen = expanded.has(productName);
+                const activeInProduct = colorRows.filter((r) => getState(r).enabled).length;
                 return (
-                  <tr
-                    key={rowKey}
-                    style={{
-                      borderBottom: '1px solid var(--line-strong)',
-                      background: state.enabled ? 'transparent' : 'var(--surface)',
-                      opacity: state.enabled ? 1 : 0.6,
-                    }}
-                  >
-                    <td style={tdStyle}>{row.productName}</td>
-                    <td style={{ ...tdStyle, color: 'var(--ink-soft)' }}>{row.color}</td>
+                  <>
+                    {/* Product header row */}
+                    <tr
+                      key={productName}
+                      style={{ background: 'var(--surface)', borderBottom: '1px solid var(--line-strong)', cursor: 'pointer' }}
+                      onClick={() => toggle(productName)}
+                    >
+                      <td style={{ ...td, fontWeight: 700, color: 'var(--ink)' }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                          {isOpen
+                            ? <ChevronDown size={15} style={{ color: 'var(--ink-soft)', flexShrink: 0 }} />
+                            : <ChevronRight size={15} style={{ color: 'var(--ink-soft)', flexShrink: 0 }} />}
+                          {productName}
+                          <span style={{ fontSize: '0.74rem', fontWeight: 400, color: 'var(--ink-muted)', marginLeft: 4 }}>
+                            {colorRows.length} renk · {activeInProduct} aktif
+                          </span>
+                        </span>
+                      </td>
+                      <td colSpan={3} />
+                    </tr>
 
-                    {/* Series selector */}
-                    <td style={tdStyle}>
-                      <select
-                        className="rf-select"
-                        style={{ fontSize: '0.8rem', minHeight: 32, padding: '0 8px' }}
-                        value={state.seriesId}
-                        onChange={(e) => saveRow(row, { ...state, seriesId: e.target.value })}
-                      >
-                        <option value="">—</option>
-                        {series.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                      </select>
-                    </td>
-
-                    {/* Series count */}
-                    <td style={{ ...tdStyle, textAlign: 'center' }}>
-                      <input
-                        type="number"
-                        min={1}
-                        step={1}
-                        defaultValue={state.seriesCount}
-                        key={`${rowKey}-${state.seriesCount}`}
-                        onChange={(e) => debouncedSave(row, { ...state, seriesCount: Math.max(1, Number(e.target.value)) })}
-                        style={{ width: 56, textAlign: 'center', padding: '3px 4px', borderRadius: 5, border: '1px solid var(--line-strong)', background: 'var(--surface)', color: 'var(--ink)', fontSize: '0.83rem' }}
+                    {/* Color rows */}
+                    {isOpen && colorRows.map((row) => (
+                      <ColorRow
+                        key={`${row.productName}|||${row.color}`}
+                        row={row}
+                        series={series}
+                        onSave={saveRow}
                       />
-                    </td>
-
-                    {/* Toggle */}
-                    <td style={{ ...tdStyle, textAlign: 'center' }}>
-                      <button
-                        type="button"
-                        onClick={() => saveRow(row, { ...state, enabled: !state.enabled })}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: state.enabled ? 'var(--accent)' : 'var(--ink-muted)', display: 'inline-flex' }}
-                        title={state.enabled ? 'Devre dışı bırak' : 'Etkinleştir'}
-                      >
-                        {state.enabled ? <ToggleRight size={22} /> : <ToggleLeft size={22} />}
-                      </button>
-                    </td>
-                  </tr>
+                    ))}
+                  </>
                 );
               })}
             </tbody>
@@ -232,7 +253,7 @@ export function AllocationPage() {
   );
 }
 
-const thStyle: React.CSSProperties = {
+const th: React.CSSProperties = {
   padding: '8px 12px',
   fontWeight: 600,
   color: 'var(--ink-soft)',
@@ -242,8 +263,8 @@ const thStyle: React.CSSProperties = {
   whiteSpace: 'nowrap',
 };
 
-const tdStyle: React.CSSProperties = {
-  padding: '7px 12px',
+const td: React.CSSProperties = {
+  padding: '6px 12px',
   color: 'var(--ink)',
   verticalAlign: 'middle',
 };
