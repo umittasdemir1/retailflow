@@ -1,7 +1,12 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import sharp from 'sharp';
+import { createRequire } from 'node:module';
 import { appConfig } from '../config.js';
+
+const require = createRequire(import.meta.url);
+function getSharp(): typeof import('sharp') {
+  return require('sharp') as typeof import('sharp');
+}
 import type { CatalogProduct } from '../store/catalogStore.js';
 import type { PythonRecognizeResponse } from './pythonVision.js';
 
@@ -51,7 +56,7 @@ function dedupeBoxes(boxes: OpenAIMatchBox[]): OpenAIMatchBox[] {
 }
 
 async function encodeImageAsDataUrl(filePath: string, maxDimension: number): Promise<{ dataUrl: string; width: number; height: number }> {
-  let pipeline = sharp(filePath, { limitInputPixels: false }).rotate();
+  let pipeline = getSharp()(filePath, { limitInputPixels: false }).rotate();
   if (maxDimension > 0) {
     pipeline = pipeline.resize({
       width: maxDimension,
@@ -453,7 +458,7 @@ async function drawAnnotatedSlots(
   maxDimension: number,
 ): Promise<{ dataUrl: string; width: number; height: number; scaleX: number; scaleY: number }> {
   // Önce görseli yükle ve boyutlarını al
-  const meta = await sharp(imagePath, { limitInputPixels: false }).rotate().metadata();
+  const meta = await getSharp()(imagePath, { limitInputPixels: false }).rotate().metadata();
   const origW = meta.width ?? 1;
   const origH = meta.height ?? 1;
 
@@ -493,7 +498,7 @@ async function drawAnnotatedSlots(
     `<svg width="${targetW}" height="${targetH}" xmlns="http://www.w3.org/2000/svg">${svgRects}</svg>`,
   );
 
-  const pipeline = sharp(imagePath, { limitInputPixels: false }).rotate();
+  const pipeline = getSharp()(imagePath, { limitInputPixels: false }).rotate();
   if (maxDimension > 0) {
     pipeline.resize({ width: targetW, height: targetH, fit: 'fill' });
   }

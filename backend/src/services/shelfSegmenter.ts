@@ -12,7 +12,9 @@
  * products are arranged in a regular grid with visible gaps between them.
  */
 
-import sharp from 'sharp';
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
+function getSharp(): typeof import('sharp') { return require('sharp') as typeof import('sharp'); }
 
 export interface ShelfRegion {
   x: number;
@@ -132,7 +134,7 @@ export async function segmentShelf(
   origW: number,
   origH: number,
 ): Promise<ShelfRegion[]> {
-  const { data: gray } = await sharp(imagePath)
+  const { data: gray } = await getSharp()(imagePath)
     .resize(W, H, { fit: 'fill' })
     .grayscale()
     .raw()
