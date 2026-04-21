@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Panel } from '../ui/Panel';
 import { useSeries, useAllocations, useAllocationMutations, type StoreAllocation } from '../../hooks/useAllocation';
+import { useStores, useProducts } from '../../hooks/useStores';
 import { Plus, Trash2, ToggleLeft, ToggleRight } from 'lucide-react';
 
 function AllocationRow({
@@ -20,10 +21,10 @@ function AllocationRow({
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderBottom: '1px solid var(--line-strong)', fontSize: '0.84rem' }}>
       <div style={{ flex: 1, minWidth: 0 }}>
         <p style={{ fontWeight: 600, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {alloc.storeName}
+          {alloc.productName}
         </p>
         <p style={{ color: 'var(--ink-soft)', marginTop: 1, fontSize: '0.76rem' }}>
-          {alloc.productName} · {alloc.color}
+          {alloc.color}
         </p>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
@@ -51,6 +52,8 @@ function AllocationRow({
 export function AllocationPage() {
   const { data: allocations = [], isLoading } = useAllocations();
   const { data: series = [] } = useSeries();
+  const { data: stores = [] } = useStores();
+  const { data: productsData } = useProducts();
   const { add, update, remove } = useAllocationMutations();
 
   const [storeName, setStoreName] = useState('');
@@ -60,13 +63,31 @@ export function AllocationPage() {
   const [seriesCount, setSeriesCount] = useState(1);
   const [filter, setFilter] = useState('');
 
+  const storeNames = useMemo(() => stores.map((s) => s.name).sort(), [stores]);
+
+  const products = productsData?.products ?? [];
+
+  const productNames = useMemo(
+    () => [...new Set(products.map((p) => p.productName))].sort(),
+    [products],
+  );
+
+  const colorsForProduct = useMemo(() => {
+    if (!productName) return [];
+    return [...new Set(products.filter((p) => p.productName === productName).map((p) => p.colors).flat())].sort();
+  }, [products, productName]);
+
+  function handleProductChange(name: string) {
+    setProductName(name);
+    setColor('');
+  }
+
   function handleAdd() {
-    if (!storeName.trim() || !productName.trim() || !color.trim() || !seriesId) return;
+    if (!storeName || !productName || !color || !seriesId) return;
     add.mutate(
-      { storeName: storeName.trim(), productName: productName.trim(), color: color.trim(), seriesId, seriesCount, enabled: true },
+      { storeName, productName, color, seriesId, seriesCount, enabled: true },
       {
         onSuccess: () => {
-          setStoreName('');
           setProductName('');
           setColor('');
           setSeriesCount(1);
@@ -100,6 +121,8 @@ export function AllocationPage() {
     return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
   }, [filtered]);
 
+  const noData = storeNames.length === 0 || productNames.length === 0;
+
   return (
     <div className="rf-page">
       <div className="rf-page-header">
@@ -111,51 +134,71 @@ export function AllocationPage() {
       </div>
 
       <div className="rf-page-analysis-grid">
-        <Panel title="Yeni Tahsisat" subtitle="Mağaza, ürün, renk ve seri seç.">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <label className="rf-field">
-              <span>Mağaza</span>
-              <input type="text" className="rf-text-input" value={storeName} onChange={(e) => setStoreName(e.target.value)} placeholder="Mağaza adı" />
-            </label>
-            <label className="rf-field">
-              <span>Ürün Adı</span>
-              <input type="text" className="rf-text-input" value={productName} onChange={(e) => setProductName(e.target.value)} placeholder="Ürün adı" />
-            </label>
-            <label className="rf-field">
-              <span>Renk</span>
-              <input type="text" className="rf-text-input" value={color} onChange={(e) => setColor(e.target.value)} placeholder="Renk" />
-            </label>
-            <label className="rf-field">
-              <span>Seri</span>
-              <select className="rf-select" value={seriesId} onChange={(e) => setSeriesId(e.target.value)}>
-                <option value="">Seri seç...</option>
-                {series.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-            </label>
-            <label className="rf-field">
-              <span>Seri Adedi</span>
-              <input
-                type="number"
-                min={1}
-                step={1}
-                className="rf-text-input"
-                value={seriesCount}
-                onChange={(e) => setSeriesCount(Number(e.target.value))}
-              />
-            </label>
-            <button
-              type="button"
-              className="rf-primary-button"
-              disabled={!storeName.trim() || !productName.trim() || !color.trim() || !seriesId || add.isPending}
-              onClick={handleAdd}
-            >
-              <Plus size={15} style={{ marginRight: 6 }} />Ekle
-            </button>
-          </div>
+        <Panel title="Yeni Tahsisat" subtitle={noData ? 'Önce veri yükle.' : 'Mağaza, ürün, renk ve seri seç.'}>
+          {noData ? (
+            <p style={{ fontSize: '0.84rem', color: 'var(--ink-muted)' }}>
+              Mağaza ve ürün listesi için önce bir Excel/CSV dosyası yükle.
+            </p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <label className="rf-field">
+                <span>Mağaza</span>
+                <select className="rf-select" value={storeName} onChange={(e) => setStoreName(e.target.value)}>
+                  <option value="">Mağaza seç...</option>
+                  {storeNames.map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </label>
+
+              <label className="rf-field">
+                <span>Ürün</span>
+                <select className="rf-select" value={productName} onChange={(e) => handleProductChange(e.target.value)}>
+                  <option value="">Ürün seç...</option>
+                  {productNames.map((p) => <option key={p} value={p}>{p}</option>)}
+                </select>
+              </label>
+
+              <label className="rf-field">
+                <span>Renk</span>
+                <select className="rf-select" value={color} onChange={(e) => setColor(e.target.value)} disabled={!productName}>
+                  <option value="">Renk seç...</option>
+                  {colorsForProduct.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </label>
+
+              <label className="rf-field">
+                <span>Seri</span>
+                <select className="rf-select" value={seriesId} onChange={(e) => setSeriesId(e.target.value)}>
+                  <option value="">Seri seç...</option>
+                  {series.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </label>
+
+              <label className="rf-field">
+                <span>Seri Adedi</span>
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  className="rf-text-input"
+                  value={seriesCount}
+                  onChange={(e) => setSeriesCount(Math.max(1, Number(e.target.value)))}
+                />
+              </label>
+
+              <button
+                type="button"
+                className="rf-primary-button"
+                disabled={!storeName || !productName || !color || !seriesId || add.isPending}
+                onClick={handleAdd}
+              >
+                <Plus size={15} style={{ marginRight: 6 }} />Ekle
+              </button>
+            </div>
+          )}
         </Panel>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <input
               type="text"
               className="rf-text-input"
@@ -164,8 +207,8 @@ export function AllocationPage() {
               placeholder="Mağaza, ürün veya renk filtrele..."
               style={{ flex: 1 }}
             />
-            <span style={{ alignSelf: 'center', fontSize: '0.8rem', color: 'var(--ink-soft)', whiteSpace: 'nowrap' }}>
-              {allocations.length} tahsisat
+            <span style={{ fontSize: '0.8rem', color: 'var(--ink-soft)', whiteSpace: 'nowrap' }}>
+              {allocations.length} kayıt
             </span>
           </div>
 
