@@ -1,4 +1,5 @@
-import ExcelJS, { type Worksheet } from 'exceljs';
+import type ExcelJSType from 'exceljs';
+import type { Worksheet } from 'exceljs';
 import type { AnalysisResult, TransferSuggestion } from '@retailflow/shared';
 
 const headerFill = {
@@ -27,6 +28,7 @@ const thinBorder = {
 };
 
 export async function buildExcelReport(result: AnalysisResult): Promise<Buffer> {
+  const ExcelJS = (await import('exceljs')).default as typeof ExcelJSType;
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'RetailFlow';
   workbook.created = new Date();

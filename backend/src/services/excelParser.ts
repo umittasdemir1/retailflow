@@ -1,8 +1,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { createRequire } from 'node:module';
 import { TextDecoder } from 'node:util';
-import * as XLSX from 'xlsx';
 import { parseLocaleNumber, toText, type InventoryRecord } from '@retailflow/shared';
+
+const require = createRequire(import.meta.url);
+function getXLSX(): typeof import('xlsx') {
+  return require('xlsx') as typeof import('xlsx');
+}
 
 const columnMap = {
   'Depo Adi': 'warehouseName',
@@ -75,12 +80,14 @@ export function parseExcelFile(filePath: string): ParsedUpload {
 }
 
 function readWorkbookRows(filePath: string): Record<string, unknown>[] {
+  const XLSX = getXLSX();
   const workbook = XLSX.read(fs.readFileSync(filePath), { type: 'buffer', cellDates: false, raw: false, codepage: 65001 });
   const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
   return XLSX.utils.sheet_to_json<Record<string, unknown>>(firstSheet, { defval: '' });
 }
 
 function readCsvRows(filePath: string): Record<string, unknown>[] {
+  const XLSX = getXLSX();
   const buffer = fs.readFileSync(filePath);
   const utf8 = tryDecode(buffer, 'utf-8');
   const text = utf8 ?? tryDecode(buffer, 'windows-1254') ?? buffer.toString('latin1');
