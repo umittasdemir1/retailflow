@@ -2,20 +2,21 @@ import type { RetailFlowStrategy, TransferSimulation, TransferType } from '@reta
 
 const TRANSFER_TYPE_LABELS: Record<TransferType, string> = {
   global: 'Global',
-  targeted: 'Hedefli',
-  size_completion: 'Beden Tamamlama',
+  targeted: 'Targeted',
+  size_completion: 'Size Completion',
 };
 
 const STRATEGY_LABELS: Record<RetailFlowStrategy, string> = {
-  sakin: 'Sakin',
-  kontrollu: 'Kontrollü',
-  agresif: 'Agresif',
+  sakin: 'Calm',
+  kontrollu: 'Controlled',
+  agresif: 'Aggressive',
+  custom: 'Custom',
 };
 
 const RISK_LEVEL_LABELS: Record<TransferSimulation['riskLevel'], string> = {
-  LOW: 'Düşük',
-  MEDIUM: 'Orta',
-  HIGH: 'Yüksek',
+  LOW: 'Low',
+  MEDIUM: 'Medium',
+  HIGH: 'High',
 };
 
 export function formatTransferTypeLabel(value: TransferType | string): string {

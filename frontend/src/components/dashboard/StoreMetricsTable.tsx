@@ -2,22 +2,22 @@ import type { StoreMetrics } from '@retailflow/shared';
 
 export function StoreMetricsTable(props: { stores: StoreMetrics[]; isLoading: boolean }) {
   if (props.isLoading) {
-    return <div className="rf-inline-note">Mağaza metrikleri yükleniyor...</div>;
+    return <div className="rf-inline-note">Loading store metrics...</div>;
   }
   if (props.stores.length === 0) {
-    return <div className="rf-inline-note">Veri yüklendikten sonra mağaza tablosu burada listelenir.</div>;
+    return <div className="rf-inline-note">Store table will appear after data is loaded.</div>;
   }
   return (
     <div className="rf-table-wrap">
       <table className="rf-table">
         <thead>
           <tr>
-            <th>Mağaza</th>
+            <th>Store</th>
             <th>STR</th>
-            <th>Satış</th>
-            <th>Envanter</th>
-            <th>Cover Günü</th>
-            <th>Kaynak</th>
+            <th>Sales</th>
+            <th>Inventory</th>
+            <th>Cover Days</th>
+            <th>Source</th>
           </tr>
         </thead>
         <tbody>
@@ -28,7 +28,7 @@ export function StoreMetricsTable(props: { stores: StoreMetrics[]; isLoading: bo
               <td>{store.totalSales}</td>
               <td>{store.totalInventory}</td>
               <td>{store.coverDays == null ? 'N/A' : store.coverDays.toFixed(1)}</td>
-              <td>{store.isPrioritySource ? 'Merkez/Online' : 'Mağaza'}</td>
+              <td>{store.isPrioritySource ? 'Hub/Online' : 'Store'}</td>
             </tr>
           ))}
         </tbody>

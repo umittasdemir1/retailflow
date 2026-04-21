@@ -5,7 +5,9 @@ export interface TransferComputationDetails {
   appliedFilter: string;
   senderStr: number;
   receiverStr: number;
-  strDiff: number;
+  senderDOS: number | null;
+  receiverDOS: number | null;
+  dosDiff: number | null;
   theoreticalTransfer: number;
 }
 
@@ -34,67 +36,113 @@ export function computeCoverDays(inventory: number, salesVelocity: number): numb
   return inventory / salesVelocity;
 }
 
+export function computeDOS(inventory: number, velocity: number): number | null {
+  return computeCoverDays(inventory, velocity);
+}
+
 export function checkTransferConditions(
   senderSales: number,
   senderInventory: number,
   receiverSales: number,
   receiverInventory: number,
   config: StrategyConfig,
+  analysisDays = 30,
 ): { eligible: boolean; reason: string } {
-  if (senderInventory < config.minInventory) {
+  if (senderInventory <= config.minInventory) {
     return {
       eligible: false,
-      reason: `Gönderen envanter yetersiz (${senderInventory} < ${config.minInventory})`,
+      reason: `Kaynak stok yetersiz (${senderInventory} ≤ ${config.minInventory})`,
     };
   }
 
-  const senderStr = computeStr(senderSales, senderInventory);
-  const receiverStr = computeStr(receiverSales, receiverInventory);
-  const strDiff = receiverStr - senderStr;
+  const senderVelocity = computeSalesVelocity(senderSales, analysisDays);
+  const senderDOS = computeDOS(senderInventory, senderVelocity);
 
-  if (strDiff < config.minStrDiff) {
+  // senderDOS null → sender has zero velocity (warehouse/depot) → treat as infinite supply, skip check
+  if (senderDOS !== null && senderDOS < config.minSourceDOS) {
     return {
       eligible: false,
-      reason: `STR farkı yetersiz (${(strDiff * 100).toFixed(1)}% < ${(config.minStrDiff * 100).toFixed(1)}%)`,
+      reason: `Kaynak kapama günü yetersiz (${senderDOS.toFixed(1)}g < ${config.minSourceDOS}g)`,
     };
   }
 
-  const transfer = computeStrBasedTransfer(senderSales, senderInventory, receiverSales, receiverInventory, config);
+  const receiverVelocity = computeSalesVelocity(receiverSales, analysisDays);
+  // inventory=0 with any velocity → completely out of stock → treat as 0 DOS (critical)
+  const receiverDOS = receiverInventory === 0
+    ? 0
+    : computeDOS(receiverInventory, receiverVelocity);
+
+  // receiverDOS null → receiver has stock but no velocity (items aren't selling) → skip transfer
+  if (receiverDOS === null || receiverDOS >= config.maxReceiverDOS) {
+    const dosLabel = receiverDOS === null ? '∞' : receiverDOS.toFixed(1);
+    return {
+      eligible: false,
+      reason: `Alıcı kapama günü yeterli (${dosLabel}g ≥ ${config.maxReceiverDOS}g)`,
+    };
+  }
+
+  const transfer = computeDOSBasedTransfer(
+    senderSales, senderInventory,
+    receiverSales, receiverInventory,
+    config, analysisDays,
+  );
+
   if (transfer.quantity <= 0) {
     return { eligible: false, reason: 'Transfer miktarı hesaplanamadı' };
   }
 
+  const senderDOSLabel = senderDOS === null ? '∞' : senderDOS.toFixed(1);
   return {
     eligible: true,
-    reason: `STR: A${(transfer.receiverStr * 100).toFixed(1)}%>G${(transfer.senderStr * 100).toFixed(1)}%, T:${transfer.quantity}`,
+    reason: `Kaynak: ${senderDOSLabel}g → Alıcı: ${receiverDOS.toFixed(1)}g, miktar: ${transfer.quantity}`,
   };
 }
 
-export function computeStrBasedTransfer(
+export function computeDOSBasedTransfer(
   senderSales: number,
   senderInventory: number,
   receiverSales: number,
   receiverInventory: number,
   config: StrategyConfig,
+  analysisDays = 30,
 ): TransferComputationDetails {
   const senderStr = computeStr(senderSales, senderInventory);
   const receiverStr = computeStr(receiverSales, receiverInventory);
-  const strDiff = receiverStr - senderStr;
-  const theoreticalTransfer = strDiff * senderInventory;
-  const maxTransfer40 = senderInventory * 0.4;
-  const minRemaining = senderInventory - config.minInventory;
 
-  let rawQuantity = theoreticalTransfer;
-  let appliedFilter = 'Teorik';
+  const senderVelocity = computeSalesVelocity(senderSales, analysisDays);
+  const receiverVelocity = computeSalesVelocity(receiverSales, analysisDays);
 
-  if (maxTransfer40 < rawQuantity) {
-    rawQuantity = maxTransfer40;
-    appliedFilter = 'Maks. %40';
+  const senderDOS = computeDOS(senderInventory, senderVelocity);
+  const receiverDOS = receiverInventory === 0
+    ? 0
+    : (computeDOS(receiverInventory, receiverVelocity) ?? null);
+
+  const dosDiff = senderDOS !== null && receiverDOS !== null
+    ? Number((senderDOS - receiverDOS).toFixed(1))
+    : null;
+
+  // Theoretical quantity: equilibrate DOS between sender and receiver
+  const totalVelocity = senderVelocity + receiverVelocity;
+  let theoreticalTransfer: number;
+  if (totalVelocity > 0) {
+    const equilibriumDOS = (senderInventory + receiverInventory) / totalVelocity;
+    theoreticalTransfer = Math.max(0, equilibriumDOS * receiverVelocity - receiverInventory);
+  } else {
+    // Both stores have zero velocity (e.g., warehouse-to-depot); transfer half the excess
+    theoreticalTransfer = Math.max(0, (senderInventory - config.minInventory) / 2);
   }
 
-  if (minRemaining < rawQuantity) {
-    rawQuantity = minRemaining;
-    appliedFilter = `Min ${config.minInventory} kalsın`;
+  let rawQuantity = theoreticalTransfer;
+  let appliedFilter = 'Teorik (DOS dengesi)';
+
+  // Source protection: don't drain sender below minSourceDOS
+  const sourceProtectionUnits = senderInventory - Math.ceil(config.minSourceDOS * senderVelocity);
+  const hardFloorUnits = senderInventory - config.minInventory;
+  const availableFromSource = Math.min(sourceProtectionUnits, hardFloorUnits);
+
+  if (availableFromSource < rawQuantity) {
+    rawQuantity = availableFromSource;
+    appliedFilter = `Kaynak koruma (min ${config.minSourceDOS}g)`;
   }
 
   if (config.maxTransfer != null && config.maxTransfer < rawQuantity) {
@@ -109,7 +157,9 @@ export function computeStrBasedTransfer(
     appliedFilter,
     senderStr,
     receiverStr,
-    strDiff,
+    senderDOS: senderDOS !== null ? Number(senderDOS.toFixed(1)) : null,
+    receiverDOS: receiverDOS !== null ? Number(receiverDOS.toFixed(1)) : null,
+    dosDiff,
     theoreticalTransfer: Number(theoreticalTransfer.toFixed(1)),
   };
 }

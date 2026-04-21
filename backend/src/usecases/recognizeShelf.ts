@@ -3,6 +3,7 @@ import type { VisionRecognizeResponse, RecognizedProduct } from '@retailflow/sha
 import { catalogStore } from '../store/catalogStore.js';
 import { sessionStore } from '../store/sessionStore.js';
 import { recognizeWithPython } from '../services/pythonVision.js';
+import { findSwimwearSales } from '../services/swimwearSales.js';
 
 function normalize(value: string): string {
   return value.trim().toLocaleUpperCase('tr');
@@ -53,6 +54,7 @@ export async function recognizeShelf(imagePath: string): Promise<VisionRecognize
       const rows = getInventoryRows(inventoryRecords, product);
       const totalSales = rows.reduce((a, r) => a + r.salesQty, 0);
       const totalInventory = rows.reduce((a, r) => a + r.inventory, 0);
+      const swimwearSales = findSwimwearSales(product.productCode, product.color);
       const strPercent =
         totalSales + totalInventory > 0
           ? Math.round((totalSales / (totalSales + totalInventory)) * 100)
@@ -71,6 +73,7 @@ export async function recognizeShelf(imagePath: string): Promise<VisionRecognize
         totalInventory: rows.length > 0 ? totalInventory : null,
         strPercent,
         storeCount: rows.length > 0 ? new Set(rows.map((r) => r.warehouseName)).size : null,
+        swimwearSalesQty: swimwearSales?.salesQty ?? null,
       };
     });
 

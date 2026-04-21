@@ -3,7 +3,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 
 
 export function StrChart(props: { stores: StoreMetrics[] }) {
   if (props.stores.length === 0) {
-    return <div className="rf-inline-note">Veri yüklenince STR dağılımı burada görünecek.</div>;
+    return <div className="rf-inline-note">STR distribution will appear after data is loaded.</div>;
   }
 
   const data = props.stores

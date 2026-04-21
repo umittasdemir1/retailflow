@@ -7,8 +7,16 @@ import {
   updateCatalogProduct,
   deleteCatalogProduct,
   recognizeShelf,
+  fetchCalibrations,
+  saveCalibration,
+  deleteCalibration,
   type VisionProvider,
+  type StoreCalibration,
+  type CalibrationRect,
+  type CalibrationDot,
 } from '../lib/api';
+
+export type { StoreCalibration, CalibrationRect, CalibrationDot };
 
 export function useVisionStatus() {
   return useQuery({
@@ -33,7 +41,7 @@ export function useAddCatalogProduct() {
       meta,
     }: {
       images: File[];
-      meta: { productCode: string; productName: string; color: string; description: string; provider?: VisionProvider };
+      meta: { productCode: string; productName: string; color: string; provider?: VisionProvider };
     }) => addCatalogProduct(images, meta),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['visionCatalog'] });
@@ -46,7 +54,7 @@ export function useAddCatalogProductFromCdn() {
   return useMutation({
     mutationFn: (meta: {
       productCode: string; colorCode: string;
-      productName: string; color: string; description: string;
+      productName: string; color: string;
       provider?: VisionProvider;
     }) => addCatalogProductFromCdn(meta),
     onSuccess: () => {
@@ -58,7 +66,7 @@ export function useAddCatalogProductFromCdn() {
 export function useUpdateCatalogProduct() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, meta }: { id: string; meta: { productCode?: string; productName?: string; color?: string; description?: string } }) =>
+    mutationFn: ({ id, meta }: { id: string; meta: { productCode?: string; productName?: string; color?: string } }) =>
       updateCatalogProduct(id, meta),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['visionCatalog'] });
@@ -78,6 +86,51 @@ export function useDeleteCatalogProduct() {
 
 export function useRecognizeShelf() {
   return useMutation({
-    mutationFn: ({ image, provider }: { image: File; provider: VisionProvider }) => recognizeShelf(image, provider),
+    mutationFn: ({
+      image,
+      provider,
+      calibrationId,
+      catalogProductIds,
+    }: {
+      image: File;
+      provider: VisionProvider;
+      calibrationId?: string;
+      catalogProductIds?: string[];
+    }) => recognizeShelf(image, provider, calibrationId, catalogProductIds),
+  });
+}
+
+export function useCalibrations() {
+  return useQuery({
+    queryKey: ['calibrations'],
+    queryFn: fetchCalibrations,
+  });
+}
+
+export function useSaveCalibration() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      storeName,
+      data,
+      image,
+    }: {
+      storeName: string;
+      data: Omit<StoreCalibration, 'id' | 'storeName' | 'createdAt' | 'updatedAt'>;
+      image?: File;
+    }) => saveCalibration(storeName, data, image),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['calibrations'] });
+    },
+  });
+}
+
+export function useDeleteCalibration() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: deleteCalibration,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['calibrations'] });
+    },
   });
 }

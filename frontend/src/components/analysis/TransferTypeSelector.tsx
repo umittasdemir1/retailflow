@@ -2,8 +2,8 @@ import type { AnalyzeRequest } from '@retailflow/shared';
 
 const MODES: { key: AnalyzeRequest['transferType']; label: string }[] = [
   { key: 'global', label: 'Global' },
-  { key: 'targeted', label: 'Hedefli' },
-  { key: 'size_completion', label: 'Beden Tamamlama' },
+  { key: 'targeted', label: 'Targeted' },
+  { key: 'size_completion', label: 'Size Completion' },
 ];
 
 export function TransferTypeSelector(props: {

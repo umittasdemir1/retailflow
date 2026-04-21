@@ -1,9 +1,9 @@
 type StatusBadgeState = 'healthy' | 'loading' | 'offline';
 
 const STATUS_LABEL: Record<StatusBadgeState, string> = {
-  healthy: 'API hazır',
-  loading: 'API kontrol ediliyor',
-  offline: 'API erişilemiyor',
+  healthy: 'API ready',
+  loading: 'API checking',
+  offline: 'API unreachable',
 };
 
 export function StatusBadge(props: { state: StatusBadgeState }) {

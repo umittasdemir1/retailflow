@@ -7,6 +7,7 @@ import {
   Package,
   MapPin,
   ScanSearch,
+  BookOpen,
   Settings,
   Activity,
   ChevronsLeft,
@@ -15,7 +16,7 @@ import {
   X,
 } from 'lucide-react';
 
-export type ActivePage = 'dashboard' | 'upload' | 'products' | 'locations' | 'analysis' | 'results' | 'vision';
+export type ActivePage = 'dashboard' | 'upload' | 'products' | 'locations' | 'analysis' | 'results' | 'vision' | 'guide';
 
 interface NavItem {
   id: ActivePage;
@@ -25,12 +26,13 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   { id: 'dashboard', icon: <LayoutDashboard size={24} strokeWidth={1.7} />, label: 'Dashboard' },
-  { id: 'upload',    icon: <Upload size={24} strokeWidth={1.7} />,          label: 'Veri Yükle' },
-  { id: 'products',  icon: <Package size={24} strokeWidth={1.7} />,         label: 'Ürünler' },
-  { id: 'locations', icon: <MapPin size={24} strokeWidth={1.7} />,          label: 'Lokasyonlar' },
-  { id: 'analysis',  icon: <BarChart3 size={24} strokeWidth={1.7} />,       label: 'Analiz' },
-  { id: 'results',   icon: <ArrowLeftRight size={24} strokeWidth={1.7} />,  label: 'Sonuçlar' },
-  { id: 'vision',    icon: <ScanSearch size={24} strokeWidth={1.7} />,      label: 'Görsel Arama' },
+  { id: 'upload',    icon: <Upload size={24} strokeWidth={1.7} />,          label: 'Upload Data' },
+  { id: 'products',  icon: <Package size={24} strokeWidth={1.7} />,         label: 'Products' },
+  { id: 'locations', icon: <MapPin size={24} strokeWidth={1.7} />,          label: 'Locations' },
+  { id: 'analysis',  icon: <BarChart3 size={24} strokeWidth={1.7} />,       label: 'Analysis' },
+  { id: 'results',   icon: <ArrowLeftRight size={24} strokeWidth={1.7} />,  label: 'Results' },
+  { id: 'vision',    icon: <ScanSearch size={24} strokeWidth={1.7} />,      label: 'Visual Search' },
+  { id: 'guide',     icon: <BookOpen size={24} strokeWidth={1.7} />,       label: 'Strateji Rehberi' },
 ];
 
 interface Props {
@@ -65,7 +67,7 @@ export function AppShell({ activePage, onPageChange, healthState, children }: Pr
           type="button"
           className="rf-mobile-hamburger"
           onClick={() => setMobileOpen((v) => !v)}
-          aria-label="Menü"
+          aria-label="Menu"
         >
           {mobileOpen ? <X size={22} strokeWidth={1.5} /> : <Menu size={22} strokeWidth={1.5} />}
         </button>
@@ -114,22 +116,22 @@ export function AppShell({ activePage, onPageChange, healthState, children }: Pr
             type="button"
             className="rf-nav-item rf-nav-item--chevron rf-desktop-only"
             onClick={() => setExpanded((v) => !v)}
-            title={expanded ? 'Daralt' : 'Genişlet'}
+            title={expanded ? 'Collapse' : 'Expand'}
           >
             <span className="rf-nav-item-icon">
               {expanded
                 ? <ChevronsLeft size={24} strokeWidth={1.7} />
                 : <ChevronsRight size={24} strokeWidth={1.7} />}
             </span>
-            {expanded && <span className="rf-nav-item-label">Daralt</span>}
+            {expanded && <span className="rf-nav-item-label">Collapse</span>}
           </button>
         </nav>
 
         {/* Bottom */}
         <div className="rf-nav-bottom">
-          <button type="button" className="rf-nav-item" title="Ayarlar">
+          <button type="button" className="rf-nav-item" title="Settings">
             <span className="rf-nav-item-icon"><Settings size={24} strokeWidth={1.7} /></span>
-            {(expanded || mobileOpen) && <span className="rf-nav-item-label">Ayarlar</span>}
+            {(expanded || mobileOpen) && <span className="rf-nav-item-label">Settings</span>}
             <div
               className="rf-nav-status"
               style={{ '--sc': statusColor } as React.CSSProperties}

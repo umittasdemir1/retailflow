@@ -59,6 +59,7 @@ export interface PythonMatchedDetection {
   description: string;
   confidence: number;
   boundingBox: { x: number; y: number; width: number; height: number };
+  dotPosition?: { x: number; y: number };
   detectorConfidence: number;
   detectorClass: string;
   margin: number;
@@ -79,7 +80,7 @@ export interface PythonRecognizeResponse {
   detections: PythonMatchedDetection[];
 }
 
-async function runPythonCommand<T>(command: 'status' | 'embed' | 'recognize', payload: object): Promise<T> {
+async function runPythonCommand<T>(command: 'status' | 'embed' | 'recognize' | 'recognize_calibrated', payload: object): Promise<T> {
   const payloadPath = path.join(os.tmpdir(), `vision-payload-${randomUUID()}.json`);
   await writeFile(payloadPath, JSON.stringify(payload), 'utf-8');
 
@@ -165,6 +166,39 @@ export async function recognizeWithPython(
 
   return runPythonCommand<PythonRecognizeResponse>('recognize', {
     imagePath,
+    catalog: pythonCatalog.map((item) => ({
+      id: item.id,
+      productCode: item.productCode,
+      productName: item.productName,
+      color: item.color,
+      description: item.description,
+      featureVector: item.featureVector,
+      featureVectors: item.featureVectors ?? [],
+    })),
+  });
+}
+
+export async function recognizeWithCalibration(
+  imagePath: string,
+  slots: Array<{ x: number; y: number; width: number; height: number }>,
+  dots: Array<{ x: number; y: number }>,
+  catalog: CatalogProduct[],
+): Promise<PythonRecognizeResponse> {
+  const pythonCatalog = catalog.filter(
+    (item) => !item.embeddingProvider || item.embeddingProvider === 'python',
+  );
+
+  if (pythonCatalog.length === 0) {
+    throw new Error(
+      'Katalogdaki tüm ürünler OpenAI embedding ile eklenmiş. ' +
+      'Yerel AI tanıma için ürünleri "Yerel Embedding" seçeneği ile yeniden ekleyin.',
+    );
+  }
+
+  return runPythonCommand<PythonRecognizeResponse>('recognize_calibrated', {
+    imagePath,
+    slots,
+    dots,
     catalog: pythonCatalog.map((item) => ({
       id: item.id,
       productCode: item.productCode,

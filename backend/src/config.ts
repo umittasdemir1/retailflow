@@ -1,6 +1,15 @@
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { config as loadEnv } from 'dotenv';
 
-loadEnv();
+const configDir = path.dirname(fileURLToPath(import.meta.url));
+const backendDir = path.resolve(configDir, '..');
+const repoRoot = path.resolve(backendDir, '..');
+const backendEnvPath = path.join(backendDir, '.env');
+const rootEnvPath = path.join(repoRoot, '.env');
+
+loadEnv({ path: backendEnvPath });
+loadEnv({ path: rootEnvPath, override: true });
 
 function positiveIntFromEnv(name: string, fallback: number): number {
   const value = Number(process.env[name]);
@@ -20,6 +29,9 @@ export const appConfig = {
   corsOrigin: process.env.CORS_ORIGIN ?? '*',
   nodeEnv: process.env.NODE_ENV ?? 'development',
   uploadDir: process.env.UPLOAD_DIR ?? 'tmp',
+  telegramBotToken: process.env.TELEGRAM_BOT_TOKEN ?? '',
+  telegramTestStore: process.env.TELEGRAM_TEST_STORE ?? 'Midtown',
+  telegramTestProvider: process.env.TELEGRAM_TEST_PROVIDER ?? 'openai',
   visionProvider,
   openAIApiKey: process.env.OPENAI_API_KEY ?? '',
   openAIVisionModel: process.env.OPENAI_VISION_MODEL ?? 'gpt-5.4',

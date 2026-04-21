@@ -12,7 +12,7 @@ import type { RejectedTransfer } from '@retailflow/shared';
 const COLUMNS: ColumnDef<RejectedTransfer>[] = [
   {
     id: 'urun',
-    header: 'Ürün',
+    header: 'Product',
     accessorFn: (row) => row.productName,
     cell: ({ row }) => (
       <td>
@@ -21,17 +21,20 @@ const COLUMNS: ColumnDef<RejectedTransfer>[] = [
       </td>
     ),
   },
-  { accessorKey: 'storeCount', header: 'Mağaza sayısı' },
+  { accessorKey: 'storeCount', header: 'Store count' },
   {
-    accessorKey: 'strDiff',
-    header: 'STR fark',
-    cell: ({ getValue }) => String(getValue<number>()) + '%',
+    accessorKey: 'dosDiff',
+    header: 'DOS Farkı (gün)',
+    cell: ({ getValue }) => {
+      const v = getValue<number | null>();
+      return v != null ? `${v}g` : '—';
+    },
   },
-  { accessorKey: 'reason', header: 'Neden' },
+  { accessorKey: 'reason', header: 'Reason' },
 ];
 
 export function RejectedTable(props: { rows: RejectedTransfer[] }) {
-  const [sorting, setSorting] = useState<SortingState>([{ id: 'strDiff', desc: true }]);
+  const [sorting, setSorting] = useState<SortingState>([{ id: 'dosDiff', desc: true }]);
 
   const table = useReactTable({
     data: props.rows,
@@ -43,7 +46,7 @@ export function RejectedTable(props: { rows: RejectedTransfer[] }) {
   });
 
   if (props.rows.length === 0) {
-    return <div className="rf-inline-note">Reddedilen ürün bulunmuyor.</div>;
+    return <div className="rf-inline-note">No rejected products.</div>;
   }
 
   return (

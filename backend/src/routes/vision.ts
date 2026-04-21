@@ -12,9 +12,12 @@ import {
   getPythonVisionStatus,
   publicCatalogProduct,
   recognizeWithPython,
+  recognizeWithCalibration,
 } from '../services/pythonVision.js';
-import { recognizeWithOpenAI, embedCatalogImagesWithOpenAI } from '../services/openaiVision.js';
+import { recognizeWithOpenAI, recognizeWithOpenAICalibrated, embedCatalogImagesWithOpenAI, generateVisualDescription } from '../services/openaiVision.js';
 import { sessionStore } from '../store/sessionStore.js';
+import { calibrationStore } from '../store/calibrationStore.js';
+import { findSwimwearSales } from '../services/swimwearSales.js';
 import type { VisionRecognizeResponse, RecognizedProduct } from '@retailflow/shared';
 
 const CDN_BASE = 'https://www.bluemint.com/cdn/shop/files';
@@ -149,12 +152,16 @@ export function visionRouter(upload: multer.Multer): Router {
 
       // Tüm referans görsellerden embedding al (hem ortalama hem tekil)
       const imagePaths = imageNames.map((n) => path.join(CATALOG_DIR, n));
+
+      // Referans görsellerden otomatik görsel açıklama üret
+      const aiDescription = await generateVisualDescription(imagePaths);
+
       // Katalog embedding her zaman CLIP (768-dim) — provider sadece TANIMA aşamasını etkiler.
       // Bu sayede OpenAI ile eklenen ürünler yerel AI ile de, OpenAI ile de tanınabilir.
-      const { featureVector, featureVectors } = await embedCatalogImages(imagePaths, description);
+      const { featureVector, featureVectors } = await embedCatalogImages(imagePaths, aiDescription);
 
 
-      const product = { id, productCode, productName, color, description, imageNames, featureVector, featureVectors, embeddingProvider: 'python' as const, addedAt: new Date().toISOString() };
+      const product = { id, productCode, productName, color, description: aiDescription, imageNames, featureVector, featureVectors, embeddingProvider: 'python' as const, addedAt: new Date().toISOString() };
       catalogStore.add(product);
       res.status(201).json(publicCatalogProduct(product));
     } catch (error) {
@@ -165,7 +172,7 @@ export function visionRouter(upload: multer.Multer): Router {
 
   // CDN'den otomatik görsel çekip kataloga ekle
   router.post('/catalog/cdn', async (req, res, next) => {
-    const { productCode, colorCode, productName, color, description, provider: rawProvider } = req.body as Record<string, string>;
+    const { productCode, colorCode, productName, color, provider: rawProvider } = req.body as Record<string, string>;
     if (!productCode?.trim() || !colorCode?.trim() || !productName?.trim()) {
       res.status(400).json({ ok: false, error: 'productCode, colorCode ve productName zorunludur' });
       return;
@@ -180,13 +187,17 @@ export function visionRouter(upload: multer.Multer): Router {
         return;
       }
       const imagePaths = imageNames.map((n) => path.join(CATALOG_DIR, n));
+
+      // Referans görsellerden otomatik görsel açıklama üret
+      const aiDescription = await generateVisualDescription(imagePaths);
+
       // Katalog embedding her zaman CLIP (768-dim) — provider sadece TANIMA aşamasını etkiler.
       // Bu sayede OpenAI ile eklenen ürünler yerel AI ile de, OpenAI ile de tanınabilir.
-      const { featureVector, featureVectors } = await embedCatalogImages(imagePaths, description);
+      const { featureVector, featureVectors } = await embedCatalogImages(imagePaths, aiDescription);
 
       const product = {
         id, productCode: productCode.trim(), productName: productName.trim(),
-        color: color?.trim() ?? '', description: description?.trim() ?? '',
+        color: color?.trim() ?? '', description: aiDescription,
         imageNames, featureVector, featureVectors, embeddingProvider: 'python' as const, addedAt: new Date().toISOString(),
       };
       catalogStore.add(product);
@@ -274,11 +285,55 @@ export function visionRouter(upload: multer.Multer): Router {
     }
 
     try {
-      const catalog = catalogStore.getAll();
-      const provider = resolveVisionProvider(req.body.provider);
-      const recognitionResult = provider === 'openai'
-        ? await recognizeWithOpenAI(req.file.path, catalog)
-        : await recognizeWithPython(req.file.path, catalog);
+      const fullCatalog = catalogStore.getAll();
+      const selectedCatalogIds = (() => {
+        const raw = req.body.catalogProductIds as string | undefined;
+        if (!raw) return null;
+        try {
+          const parsed = JSON.parse(raw) as unknown;
+          if (!Array.isArray(parsed)) return null;
+          return parsed.filter((value): value is string => typeof value === 'string' && value.trim().length > 0);
+        } catch {
+          return null;
+        }
+      })();
+      const catalog = selectedCatalogIds && selectedCatalogIds.length > 0
+        ? fullCatalog.filter((item) => selectedCatalogIds.includes(item.id))
+        : fullCatalog;
+      if (catalog.length === 0) {
+        fs.rmSync(req.file.path, { force: true });
+        res.status(400).json({ ok: false, error: 'Analiz için en az bir referans ürün seçin' });
+        return;
+      }
+      const provider    = resolveVisionProvider(req.body.provider);
+      const calibrationId = (req.body.calibrationId as string | undefined)?.trim();
+      const calibration = calibrationId ? calibrationStore.findById(calibrationId) : undefined;
+
+      let recognitionResult;
+      if (calibration && calibration.slots.length > 0) {
+        console.log(`[VISION] Kalibrasyonlu tanıma: ${calibration.storeName} — ${calibration.slots.length} slot, provider=${provider}`);
+        if (provider === 'openai') {
+          // OpenAI + Kalibrasyon: slot dikdörtgenleri görsele çizilir, tek sorguda tanıma yapılır
+          recognitionResult = await recognizeWithOpenAICalibrated(
+            req.file.path,
+            calibration.slots,
+            calibration.dots,
+            catalog,
+          );
+        } else {
+          // Yerel AI + Kalibrasyon: YOLO atla, CLIP ile her slotu eşleştir
+          recognitionResult = await recognizeWithCalibration(
+            req.file.path,
+            calibration.slots,
+            calibration.dots,
+            catalog,
+          );
+        }
+      } else if (provider === 'openai') {
+        recognitionResult = await recognizeWithOpenAI(req.file.path, catalog);
+      } else {
+        recognitionResult = await recognizeWithPython(req.file.path, catalog);
+      }
 
       // detection-centric → frontend product-centric dönüşümü
       const inventoryRecords = sessionStore.get().data ?? [];
@@ -293,6 +348,7 @@ export function visionRouter(upload: multer.Multer): Router {
         );
         const totalSales     = rows.reduce((a, r) => a + r.salesQty, 0);
         const totalInventory = rows.reduce((a, r) => a + r.inventory, 0);
+        const swimwearSales = findSwimwearSales(item.productCode, item.color);
         productMap.set(item.id, {
           catalogProductId: item.id,
           productCode:      item.productCode,
@@ -310,6 +366,7 @@ export function visionRouter(upload: multer.Multer): Router {
           storeCount:       rows.length > 0
             ? new Set(rows.map((r) => r.warehouseName)).size
             : null,
+          swimwearSalesQty: swimwearSales?.salesQty ?? null,
         });
       }
 
@@ -317,7 +374,14 @@ export function visionRouter(upload: multer.Multer): Router {
       for (const det of recognitionResult.detections) {
         const product = productMap.get(det.catalogProductId);
         if (!product) continue;
-        product.foundAt.push({ boundingBox: det.boundingBox, confidence: det.confidence });
+        const location: import('@retailflow/shared').FoundLocation = {
+          boundingBox: det.boundingBox,
+          confidence:  det.confidence,
+        };
+        if ('dotPosition' in det && det.dotPosition) {
+          location.dotPosition = det.dotPosition as { x: number; y: number };
+        }
+        product.foundAt.push(location);
         if (det.confidence > product.bestConfidence) {
           product.bestConfidence = det.confidence;
           product.found = true;

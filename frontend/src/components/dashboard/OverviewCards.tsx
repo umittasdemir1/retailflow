@@ -20,27 +20,27 @@ export function OverviewCards(props: {
   return (
     <section className="rf-overview-grid">
       <StatCard
-        label="Lokasyon"
+        label="Locations"
         value={locationCount || '—'}
-        detail="Aktif mağaza sayısı"
+        detail="Active store count"
         accent="warm"
       />
       <StatCard
-        label="Ürün"
+        label="Products"
         value={props.uploadInfo ? fmt(props.uploadInfo.uniqueProductCount) : '—'}
-        detail={props.uploadInfo ? props.uploadInfo.uniqueColorCount + ' benzersiz renk' : 'Veri yüklenmedi'}
+        detail={props.uploadInfo ? props.uploadInfo.uniqueColorCount + ' unique colors' : 'No data loaded'}
         accent="cool"
       />
       <StatCard
-        label="Satış"
+        label="Sales"
         value={totalSales > 0 ? fmt(totalSales) : '—'}
-        detail="Toplam satış adedi"
+        detail="Total sales count"
         accent="bright"
       />
       <StatCard
-        label="Envanter"
+        label="Inventory"
         value={totalInventory > 0 ? fmt(totalInventory) : '—'}
-        detail="Toplam stok adedi"
+        detail="Total stock count"
         accent="deep"
       />
     </section>

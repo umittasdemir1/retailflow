@@ -10,7 +10,7 @@ export function normalizeError(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
   }
-  return 'Beklenmeyen bir hata oluştu.';
+  return 'An unexpected error occurred.';
 }
 
 export function buildClientFileName(
@@ -23,8 +23,8 @@ export function buildClientFileName(
       ? 'global-transfer'
       : transferType === 'targeted'
         ? 'targeted-transfer'
-        : 'beden-tamamlama';
-  return [base, targetStore || 'tum-magazalar', strategy, Date.now()].join('-') + '.xlsx';
+        : 'size-completion';
+  return [base, targetStore || 'all-stores', strategy, Date.now()].join('-') + '.xlsx';
 }
 
 export function downloadBlob(blob: Blob, filename: string): void {

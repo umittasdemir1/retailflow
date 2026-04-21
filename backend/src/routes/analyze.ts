@@ -48,9 +48,9 @@ function buildAnalyzeResponse(result: AnalysisResult, beforeAnalysis: number, af
 
 function isValidationError(message: string): boolean {
   return [
-    'Önce veri yükleyin',
-    'Geçerli bir hedef mağaza seçin',
-    'Hedefli analiz için hedef mağaza gerekli',
-    'Beden tamamlama için hedef mağaza gerekli',
+    'Upload data first',
+    'Select a valid target store',
+    'Target store required for targeted analysis',
+    'Target store required for size completion',
   ].includes(message);
 }

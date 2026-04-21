@@ -1,37 +1,9 @@
 import { Router } from 'express';
+import type { ProductSummary, ProductsResponse } from '@retailflow/shared';
 import { sessionStore } from '../store/sessionStore.js';
 
 export const productsRouter = Router();
-
-export interface ProductSummary {
-  productCode: string;
-  productName: string;
-  imageUrl: string | null;
-  colors: string[];
-  sizes: string[];
-  totalInventory: number;
-  totalSales: number;
-  totalReturns: number;
-  str: number;
-  strPercent: number;
-  storeCount: number;
-  variantCount: number;
-  gender: string | null;
-  stockStatus: 'KRITIK' | 'DUSUK' | 'NORMAL' | 'YUKSEK';
-  price: number | null;
-  category: string | null;
-}
-
-export interface ProductsResponse {
-  products: ProductSummary[];
-  stats: {
-    totalProducts: number;
-    totalSold: number;
-    totalReturned: number;
-    avgStrPercent: number;
-    bestSeller: { productName: string; totalSales: number } | null;
-  };
-}
+export type { ProductSummary, ProductsResponse };
 
 function stockStatus(inventory: number): ProductSummary['stockStatus'] {
   if (inventory <= 5)  return 'KRITIK';
@@ -52,11 +24,12 @@ productsRouter.get('/', (_req, res) => {
     return;
   }
 
-  // Aggregate by productCode
+  // Aggregate by productName (one row per product name across all seasons/codes)
   const map = new Map<string, {
     productCode: string;
     productName: string;
     imageUrl: string | null;
+    productCodes: Set<string>;
     colors: Set<string>;
     sizes: Set<string>;
     variants: Set<string>;
@@ -70,12 +43,13 @@ productsRouter.get('/', (_req, res) => {
   }>();
 
   for (const record of data) {
-    const key = record.productCode;
+    const key = record.productName;
     if (!map.has(key)) {
       map.set(key, {
         productCode: record.productCode,
         productName: record.productName,
         imageUrl: record.itemUrl ?? null,
+        productCodes: new Set(),
         colors: new Set(),
         sizes: new Set(),
         variants: new Set(),
@@ -92,9 +66,10 @@ productsRouter.get('/', (_req, res) => {
     if (!p.imageUrl && record.itemUrl) p.imageUrl = record.itemUrl;
     if (p.price == null && record.price != null) p.price = record.price;
     if (p.category == null && record.category) p.category = record.category;
+    p.productCodes.add(record.productCode);
     if (record.color) p.colors.add(record.color);
     if (record.size)  p.sizes.add(record.size);
-    p.variants.add(`${record.color}__${record.size}`);
+    p.variants.add(`${record.productCode}__${record.color}__${record.size}`);
     p.totalInventory += record.inventory;
     p.totalSales     += record.salesQty;
     p.totalReturns   += record.returnQty ?? 0;
@@ -110,7 +85,6 @@ productsRouter.get('/', (_req, res) => {
       imageUrl:      p.imageUrl,
       colors:        Array.from(p.colors).sort(),
       sizes:         Array.from(p.sizes).sort((a, b) => {
-        // Numeric-aware size sort
         const sizeOrder = ['XXS','XS','S','M','L','XL','XXL','XXXL','3XL','4XL'];
         const ai = sizeOrder.indexOf(a.toUpperCase());
         const bi = sizeOrder.indexOf(b.toUpperCase());
@@ -126,6 +100,7 @@ productsRouter.get('/', (_req, res) => {
       strPercent:     Math.round(str * 100),
       storeCount:     p.storeNames.size,
       variantCount:   p.variants.size,
+      seasonCount:    p.productCodes.size,
       gender:         p.gender,
       stockStatus:    stockStatus(p.totalInventory),
       price:          p.price,

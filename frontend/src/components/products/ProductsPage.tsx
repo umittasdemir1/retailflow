@@ -45,7 +45,7 @@ function StrGauge({ percent }: { percent: number }) {
     return {
       x:   CX + R * Math.cos(rad),
       y:   CY - R * Math.sin(rad),
-      rot: 90 - deg,   // long axis (PH) radyal yönde
+      rot: 90 - deg,   // long axis (PH) aligned radially
       on:  i < filled,
     };
   });
@@ -66,15 +66,6 @@ function StrGauge({ percent }: { percent: number }) {
           />
         ))}
       </svg>
-    </div>
-  );
-}
-
-/* ── Visibility Toggle ──────────────────────────────────────────── */
-function VisibilityToggle({ active }: { active: boolean }) {
-  return (
-    <div className={`prd-toggle${active ? ' is-on' : ''}`}>
-      <div className="prd-toggle-thumb" />
     </div>
   );
 }
@@ -167,7 +158,7 @@ export function ProductsPage({ data, isLoading }: Props) {
       {/* Header */}
       <div className="rf-page-header">
         <div>
-          <p className="rf-page-eyebrow">Ürün Kataloğu</p>
+          <p className="rf-page-eyebrow">Product Catalog</p>
           <h1 className="rf-page-title">All Product List</h1>
         </div>
         <div className="prd-header-actions">
@@ -219,7 +210,7 @@ export function ProductsPage({ data, isLoading }: Props) {
           <table className="rf-table prd-table">
             <tbody>
               {isLoading && (
-                <tr><td colSpan={5} className="prd-loading-cell">Yükleniyor...</td></tr>
+                <tr><td colSpan={5} className="prd-loading-cell">Loading...</td></tr>
               )}
               {!isLoading && rows.length === 0 && (
                 <tr>
@@ -271,7 +262,12 @@ function ProductRow({ product }: { product: ProductSummary }) {
           <div className="prd-product-info">
             <strong>{product.productName}</strong>
             {product.colors.length > 0 && (
-              <span className="prd-product-colors">Opsiyon: <span className="prd-product-colors-num">{product.colors.length}</span></span>
+              <span className="prd-product-colors">
+                Options: <span className="prd-product-colors-num">{product.colors.length}</span>
+                {product.seasonCount > 1 && (
+                  <span className="prd-product-season"> &nbsp;Season: <span className="prd-product-colors-num">{product.seasonCount}</span></span>
+                )}
+              </span>
             )}
           </div>
         </div>

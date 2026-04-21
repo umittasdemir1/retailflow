@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import type { AnalyzeRequest } from '@retailflow/shared';
+import { useEffect, useMemo, useState } from 'react';
+import type { AnalyzeRequest, StrategyConfig } from '@retailflow/shared';
 
 import { useUpload } from './hooks/useUpload';
 import { useAnalysis, useSimulate } from './hooks/useAnalysis';
@@ -14,12 +14,14 @@ import { UploadZone } from './components/upload/UploadZone';
 import { StoreLeaderboard } from './components/dashboard/StoreLeaderboard';
 import { StrChart } from './components/dashboard/StrChart';
 import { StoreMetricsTable } from './components/dashboard/StoreMetricsTable';
-import { StrategySelector, StrategyDetails } from './components/analysis/StrategySelector';
+import { StrategySelector } from './components/analysis/StrategySelector';
 import { TransferTypeSelector } from './components/analysis/TransferTypeSelector';
 import { StoreSelector } from './components/analysis/StoreSelector';
+import { CategoryFilter } from './components/analysis/CategoryFilter';
 import { ProductsPage } from './components/products/ProductsPage';
 import { LocationsPage } from './components/locations/LocationsPage';
 import { VisionPage } from './components/vision/VisionPage';
+import { GuidePage } from './components/guide/GuidePage';
 import { SummaryPanel } from './components/results/SummaryPanel';
 import { SimulationPanel } from './components/results/SimulationPanel';
 import { TransferTable } from './components/results/TransferTable';
@@ -35,6 +37,11 @@ export default function App() {
   const [transferType, setTransferType] = useState<AnalyzeRequest['transferType']>('global');
   const [targetStore, setTargetStore] = useState('');
   const [excludedStores, setExcludedStores] = useState<string[]>([]);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [includedCategories, setIncludedCategories] = useState<string[]>([]);
+  const [groupingMode, setGroupingMode] = useState<'name' | 'sku'>('name');
+  const [customConfig, setCustomConfig] = useState<Partial<StrategyConfig>>({});
   const [analysis, setAnalysis] = useState<AnalysisView | null>(null);
   const [notifs, setNotifs] = useState<NotifItem[]>([]);
 
@@ -53,7 +60,6 @@ export default function App() {
   const strategies = strategiesQuery.data ?? [];
   const stores = storesQuery.data ?? [];
   const topStores = stores.slice().sort((a, b) => b.strPercent - a.strPercent);
-  const currentStrategyConfig = strategies.find((s) => s.name === strategy) ?? null;
   const analysisControlsDisabled = (health?.dataLoaded ?? false) === false || analyzeMutation.isPending;
 
   const healthState =
@@ -81,11 +87,26 @@ export default function App() {
     setExcludedStores((current) => current.filter((s) => s !== targetStore));
   }, [targetStore]);
 
+  const analysisDays = useMemo(() => {
+    if (!startDate || !endDate) return undefined;
+    const diff = Math.round((new Date(endDate).getTime() - new Date(startDate).getTime()) / 86_400_000);
+    return diff > 0 ? diff : undefined;
+  }, [startDate, endDate]);
+
+  const categories = useMemo(() => {
+    if (!productsQuery.data) return [];
+    return [...new Set(productsQuery.data.products.map((p) => p.category).filter((c): c is string => c !== null))].sort();
+  }, [productsQuery.data]);
+
   const activePayload: AnalyzeRequest = {
     strategy,
     transferType,
     targetStore: transferType === 'global' ? undefined : targetStore,
     excludedStores,
+    analysisDays,
+    includedCategories: includedCategories.length > 0 ? includedCategories : undefined,
+    groupingMode: groupingMode !== 'name' ? groupingMode : undefined,
+    customConfig: strategy === 'custom' ? customConfig : undefined,
   };
 
   function notify(type: NotifItem['type'], message: string) {
@@ -100,7 +121,7 @@ export default function App() {
     uploadMutation.mutate(file, {
       onSuccess: (data) => {
         setAnalysis(null);
-        notify('success', data.fileName + ' yüklendi — ' + data.rowCount.toLocaleString('tr-TR') + ' satır');
+        notify('success', data.fileName + ' uploaded — ' + data.rowCount.toLocaleString('tr-TR') + ' rows');
       },
       onError: (e) => notify('error', normalizeError(e)),
     });
@@ -110,7 +131,7 @@ export default function App() {
     analyzeMutation.mutate(activePayload, {
       onSuccess: (data) => {
         setAnalysis(data.results);
-        notify('success', data.results.totalTransferCount + ' transfer önerisi hazırlandı');
+        notify('success', data.results.totalTransferCount + ' transfer suggestions ready');
         setActivePage('results');
       },
       onError: (e) => notify('error', normalizeError(e)),
@@ -121,7 +142,7 @@ export default function App() {
     simulateMutation.mutate(undefined, {
       onSuccess: (data) => {
         setAnalysis((current) => current ? { ...current, simulation: data.impact } : current);
-        notify('info', 'Simülasyon güncellendi');
+        notify('info', 'Simulation updated');
       },
       onError: (e) => notify('error', normalizeError(e)),
     });
@@ -131,7 +152,7 @@ export default function App() {
     exportMutation.mutate(activePayload, {
       onSuccess: (blob) => {
         downloadBlob(blob, buildClientFileName(transferType, targetStore, strategy));
-        notify('success', 'Excel raporu indirildi');
+        notify('success', 'Excel report downloaded');
       },
       onError: (e) => notify('error', normalizeError(e)),
     });
@@ -143,7 +164,7 @@ export default function App() {
         setAnalysis(null);
         setTargetStore('');
         setExcludedStores([]);
-        notify('info', 'Tüm veriler temizlendi');
+        notify('info', 'All data cleared');
         setActivePage('dashboard');
       },
       onError: (e) => notify('error', normalizeError(e)),
@@ -161,20 +182,20 @@ export default function App() {
             <div className="rf-page-header">
               <div>
                 <p className="rf-page-eyebrow">RetailFlow</p>
-                <h1 className="rf-page-title">Genel Bakış</h1>
-                <p className="rf-page-subtitle">Mağaza STR dağılımı ve stok durumu.</p>
+                <h1 className="rf-page-title">Overview</h1>
+                <p className="rf-page-subtitle">Store STR distribution and inventory status.</p>
               </div>
             </div>
             <OverviewCards uploadInfo={uploadMutation.data ?? null} health={health} stores={stores} />
             <div className="rf-page-grid">
-              <Panel title="Mağaza Skoru" subtitle="STR'ye göre sıralı top 5 mağaza.">
+              <Panel title="Store Score" subtitle="Top 5 stores ranked by STR.">
                 <StoreLeaderboard stores={topStores.slice(0, 5)} />
               </Panel>
-              <Panel title="STR Dağılımı" subtitle="Tüm mağazaların sell-through dağılımı.">
+              <Panel title="STR Distribution" subtitle="Sell-through distribution across all stores.">
                 <StrChart stores={stores} />
               </Panel>
             </div>
-            <Panel title="Metrik Tablosu" subtitle="Tüm mağazaların detaylı metrik görünümü.">
+            <Panel title="Metrics Table" subtitle="Detailed metrics view for all stores.">
               <StoreMetricsTable stores={stores} isLoading={storesQuery.isLoading} />
             </Panel>
           </div>
@@ -185,13 +206,13 @@ export default function App() {
           <div className="rf-page">
             <div className="rf-page-header">
               <div>
-                <p className="rf-page-eyebrow">Veri Yönetimi</p>
-                <h1 className="rf-page-title">Veri Yükle</h1>
-                <p className="rf-page-subtitle">CSV veya Excel dosyasını yükle.</p>
+                <p className="rf-page-eyebrow">Data Management</p>
+                <h1 className="rf-page-title">Upload Data</h1>
+                <p className="rf-page-subtitle">Upload a CSV or Excel file.</p>
               </div>
             </div>
             <div className="rf-page-single">
-              <Panel title="Dosya Yükle" subtitle="CSV veya Excel dosyasını bırak ya da seç.">
+              <Panel title="Upload File" subtitle="Drop or select a CSV or Excel file.">
                 <UploadZone
                   isUploading={uploadMutation.isPending}
                   uploadInfo={uploadMutation.data ?? null}
@@ -205,7 +226,7 @@ export default function App() {
                   disabled={(health?.dataLoaded ?? false) === false || resetMutation.isPending}
                   onClick={handleReset}
                 >
-                  {resetMutation.isPending ? 'Temizleniyor...' : 'Tüm Veriyi Temizle'}
+                  {resetMutation.isPending ? 'Clearing...' : 'Clear All Data'}
                 </button>
               </div>
             </div>
@@ -227,27 +248,60 @@ export default function App() {
           <div className="rf-page">
             <div className="rf-page-header">
               <div>
-                <p className="rf-page-eyebrow">Optimizasyon</p>
-                <h1 className="rf-page-title">Analiz Kontrolleri</h1>
-                <p className="rf-page-subtitle">Stratejiyi, modu ve hedef mağazayı seç, ardından analizi başlat.</p>
+                <p className="rf-page-eyebrow">Optimization</p>
+                <h1 className="rf-page-title">Analysis Controls</h1>
+                <p className="rf-page-subtitle">Select strategy, mode and target store, then run analysis.</p>
               </div>
             </div>
             <div className="rf-page-analysis-grid">
               <div className="rf-panel-stack">
-                <Panel title="Strateji" subtitle="Transfer agresifliğini belirle.">
-                  <StrategySelector strategies={strategies} selected={strategy} onChange={setStrategy} />
+                <Panel title="Strategy" subtitle="Click a column to select. Edit the Custom column to define your own.">
+                  <StrategySelector
+                    strategies={strategies}
+                    selected={strategy}
+                    onChange={setStrategy}
+                    customConfig={customConfig}
+                    onCustomConfigChange={setCustomConfig}
+                  />
                 </Panel>
-                {currentStrategyConfig && (
-                  <Panel title="Strateji Detayı" subtitle="Seçili stratejinin parametre eşikleri.">
-                    <StrategyDetails config={currentStrategyConfig} />
-                  </Panel>
-                )}
               </div>
               <div className="rf-panel-stack">
-                <Panel title="Transfer Tipi" subtitle="Global, hedefli veya beden tamamlama.">
+                <Panel title="Date Range" subtitle={analysisDays != null ? `${analysisDays} analysis days` : 'Optional — defaults to 30 days if not set.'}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    <label className="rf-field">
+                      <span>Start date</span>
+                      <input type="date" className="rf-date-input" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+                    </label>
+                    <label className="rf-field">
+                      <span>End date</span>
+                      <input type="date" className="rf-date-input" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+                    </label>
+                  </div>
+                  {analysisDays != null && (
+                    <p style={{ marginTop: 8, fontSize: '0.8rem', color: 'var(--ink-soft)' }}>
+                      Cover days will be calculated over <strong>{analysisDays}</strong> days.
+                    </p>
+                  )}
+                </Panel>
+                <Panel title="Product Grouping" subtitle={groupingMode === 'name' ? 'Multi-season products are merged.' : 'Each product code treated separately.'}>
+                  <div className="rf-mode-row">
+                    <button type="button" className={`rf-mode-button${groupingMode === 'name' ? ' is-active' : ''}`} onClick={() => setGroupingMode('name')}>
+                      Product Name
+                    </button>
+                    <button type="button" className={`rf-mode-button${groupingMode === 'sku' ? ' is-active' : ''}`} onClick={() => setGroupingMode('sku')}>
+                      SKU / Code
+                    </button>
+                  </div>
+                  <p style={{ marginTop: 8, fontSize: '0.78rem', color: 'var(--ink-muted)' }}>
+                    {groupingMode === 'name'
+                      ? 'Groups by Name + Color + Size. NOLAN BLACK M across all seasons = 1 product.'
+                      : 'Groups by exact product code. NL23-BLK-M and NL24-BLK-M = 2 separate products.'}
+                  </p>
+                </Panel>
+                <Panel title="Transfer Type" subtitle="Global, targeted, or size completion.">
                   <TransferTypeSelector selected={transferType} onChange={setTransferType} />
                 </Panel>
-                <Panel title="Mağaza Filtresi" subtitle="Hedef ve hariç tutulacak mağazaları seç.">
+                <Panel title="Store Filter" subtitle="Select target and excluded stores.">
                   <StoreSelector
                     transferType={transferType}
                     targetStore={targetStore}
@@ -257,6 +311,13 @@ export default function App() {
                     onExcludedChange={setExcludedStores}
                   />
                 </Panel>
+                <Panel title="Category Filter" subtitle={includedCategories.length === 0 ? 'All categories included.' : `${includedCategories.length} of ${categories.length} selected.`}>
+                  <CategoryFilter
+                    categories={categories}
+                    included={includedCategories}
+                    onChange={setIncludedCategories}
+                  />
+                </Panel>
                 <div className="rf-action-row">
                   <button
                     type="button"
@@ -264,7 +325,7 @@ export default function App() {
                     disabled={analysisControlsDisabled}
                     onClick={handleAnalyze}
                   >
-                    {analyzeMutation.isPending ? 'Analiz çalışıyor...' : 'Analizi Başlat'}
+                    {analyzeMutation.isPending ? 'Running analysis...' : 'Start Analysis'}
                   </button>
                 </div>
               </div>
@@ -277,12 +338,12 @@ export default function App() {
           <div className="rf-page">
             <div className="rf-page-header">
               <div>
-                <p className="rf-page-eyebrow">Transfer Analizi</p>
-                <h1 className="rf-page-title">Sonuçlar</h1>
+                <p className="rf-page-eyebrow">Transfer Analysis</p>
+                <h1 className="rf-page-title">Results</h1>
                 <p className="rf-page-subtitle">
                   {analysis
-                    ? analysis.totalTransferCount + ' transfer önerisi · ' + analysis.transfers.length + ' satır'
-                    : 'Henüz analiz çalıştırılmadı.'}
+                    ? analysis.totalTransferCount + ' transfer suggestions · ' + analysis.transfers.length + ' rows'
+                    : 'No analysis run yet.'}
                 </p>
               </div>
               <div className="rf-action-row" style={{ alignSelf: 'flex-end' }}>
@@ -292,21 +353,21 @@ export default function App() {
                   disabled={analysis == null || exportMutation.isPending}
                   onClick={handleExport}
                 >
-                  {exportMutation.isPending ? 'Rapor hazırlanıyor...' : 'Excel İndir'}
+                  {exportMutation.isPending ? 'Preparing report...' : 'Download Excel'}
                 </button>
               </div>
             </div>
             <div className="rf-page-grid">
-              <Panel title="Transfer Özeti" subtitle="Risk dağılımı ve temel metrikler.">
+              <Panel title="Transfer Summary" subtitle="Risk breakdown and key metrics.">
                 <SummaryPanel analysis={analysis} />
               </Panel>
-              <Panel title="Simülasyon" subtitle="Transfer etkisini simüle et.">
+              <Panel title="Simulation" subtitle="Simulate transfer impact.">
                 <SimulationPanel analysis={analysis} isRefreshing={simulateMutation.isPending} onRefresh={handleSimulate} />
               </Panel>
             </div>
             <Panel
-              title="Transfer Önerileri"
-              subtitle={analysis ? 'Tüm transfer satırları' : 'Analiz sonuçları burada listelenecek.'}
+              title="Transfer Suggestions"
+              subtitle={analysis ? 'All transfer rows' : 'Analysis results will be listed here.'}
             >
               <TransferTable rows={analysis?.transfers ?? []} />
             </Panel>
@@ -315,6 +376,9 @@ export default function App() {
 
         {/* ─── VISION ─── */}
         {activePage === 'vision' && <VisionPage />}
+
+        {/* ─── GUIDE ─── */}
+        {activePage === 'guide' && <GuidePage />}
 
       </AppShell>
     </>

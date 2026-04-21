@@ -106,35 +106,8 @@ export async function simulateCurrentAnalysis(): Promise<SimulateResponse> {
   return response.data;
 }
 
-export interface ProductSummary {
-  productCode: string;
-  productName: string;
-  imageUrl: string | null;
-  colors: string[];
-  sizes: string[];
-  totalInventory: number;
-  totalSales: number;
-  totalReturns: number;
-  str: number;
-  strPercent: number;
-  storeCount: number;
-  variantCount: number;
-  gender: string | null;
-  stockStatus: 'KRITIK' | 'DUSUK' | 'NORMAL' | 'YUKSEK';
-  price: number | null;
-  category: string | null;
-}
-
-export interface ProductsResponse {
-  products: ProductSummary[];
-  stats: {
-    totalProducts: number;
-    totalSold: number;
-    totalReturned: number;
-    avgStrPercent: number;
-    bestSeller: { productName: string; totalSales: number } | null;
-  };
-}
+export type { ProductSummary, ProductsResponse } from '@retailflow/shared';
+import type { ProductSummary, ProductsResponse } from '@retailflow/shared';
 
 export async function fetchProducts(): Promise<ProductsResponse> {
   const response = await api.get<ProductsResponse>('/products');
@@ -169,7 +142,7 @@ export async function fetchCatalog(): Promise<import('@retailflow/shared').Catal
 
 export async function addCatalogProduct(
   images: File[],
-  meta: { productCode: string; productName: string; color: string; description: string; provider?: VisionProvider },
+  meta: { productCode: string; productName: string; color: string; provider?: VisionProvider },
 ): Promise<import('@retailflow/shared').CatalogProductPublic> {
   try {
     const formData = new FormData();
@@ -177,7 +150,6 @@ export async function addCatalogProduct(
     formData.append('productCode', meta.productCode);
     formData.append('productName', meta.productName);
     formData.append('color', meta.color);
-    formData.append('description', meta.description);
     if (meta.provider) formData.append('provider', meta.provider);
     const response = await api.post<import('@retailflow/shared').CatalogProductPublic>(
       '/vision/catalog',
@@ -237,7 +209,6 @@ export async function addCatalogProductFromCdn(meta: {
   colorCode: string;
   productName: string;
   color: string;
-  description: string;
   provider?: VisionProvider;
 }): Promise<import('@retailflow/shared').CatalogProductPublic> {
   try {
@@ -254,11 +225,17 @@ export async function addCatalogProductFromCdn(meta: {
 export async function recognizeShelf(
   image: File,
   provider: VisionProvider,
+  calibrationId?: string,
+  catalogProductIds?: string[],
 ): Promise<import('@retailflow/shared').VisionRecognizeResponse> {
   try {
     const formData = new FormData();
     formData.append('image', image);
     formData.append('provider', provider);
+    if (calibrationId) formData.append('calibrationId', calibrationId);
+    if (catalogProductIds && catalogProductIds.length > 0) {
+      formData.append('catalogProductIds', JSON.stringify(catalogProductIds));
+    }
     const response = await api.post<import('@retailflow/shared').VisionRecognizeResponse>(
       '/vision/recognize',
       formData,
@@ -268,4 +245,51 @@ export async function recognizeShelf(
   } catch (error) {
     throw toApiError(error);
   }
+}
+
+// ─── Calibration API ─────────────────────────────────────────────────────────
+
+export type { StoreCalibration, CalibrationRect, CalibrationDot } from '@retailflow/shared';
+
+export async function fetchCalibrations(): Promise<import('@retailflow/shared').StoreCalibration[]> {
+  try {
+    const response = await api.get<import('@retailflow/shared').StoreCalibration[]>('/calibration');
+    return response.data;
+  } catch (error) {
+    throw toApiError(error);
+  }
+}
+
+export async function saveCalibration(
+  storeName: string,
+  data: Omit<import('@retailflow/shared').StoreCalibration, 'id' | 'storeName' | 'createdAt' | 'updatedAt'>,
+  image?: File,
+): Promise<import('@retailflow/shared').StoreCalibration> {
+  try {
+    const formData = new FormData();
+    formData.append('storeName', storeName);
+    formData.append('data', JSON.stringify(data));
+    if (image) formData.append('image', image);
+    const response = await api.post<import('@retailflow/shared').StoreCalibration>(
+      '/calibration',
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
+    return response.data;
+  } catch (error) {
+    throw toApiError(error);
+  }
+}
+
+export async function deleteCalibration(id: string): Promise<void> {
+  try {
+    await api.delete(`/calibration/${id}`);
+  } catch (error) {
+    throw toApiError(error);
+  }
+}
+
+export function calibrationImageUrl(id: string): string {
+  const base = import.meta.env.VITE_API_BASE_URL ? `${import.meta.env.VITE_API_BASE_URL}/api` : '/api';
+  return `${base}/calibration/${id}/image`;
 }

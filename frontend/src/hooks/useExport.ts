@@ -13,6 +13,7 @@ export function useReset() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['health'] });
       queryClient.invalidateQueries({ queryKey: ['stores'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
     },
   });
 }

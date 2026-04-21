@@ -8,6 +8,7 @@ export function useUpload() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['health'] });
       queryClient.invalidateQueries({ queryKey: ['stores'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
     },
   });
 }

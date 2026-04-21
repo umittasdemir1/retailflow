@@ -12,7 +12,7 @@ import type { TransferSuggestion } from '@retailflow/shared';
 const COLUMNS: ColumnDef<TransferSuggestion>[] = [
   {
     id: 'urun',
-    header: 'Ürün',
+    header: 'Product',
     accessorFn: (row) => row.productName,
     cell: ({ row }) => (
       <td>
@@ -21,24 +21,27 @@ const COLUMNS: ColumnDef<TransferSuggestion>[] = [
       </td>
     ),
   },
-  { accessorKey: 'senderStore', header: 'Gönderen' },
-  { accessorKey: 'receiverStore', header: 'Alan' },
-  { accessorKey: 'quantity', header: 'Miktar' },
+  { accessorKey: 'senderStore', header: 'Sender' },
+  { accessorKey: 'receiverStore', header: 'Receiver' },
+  { accessorKey: 'quantity', header: 'Quantity' },
   {
-    accessorKey: 'strDiff',
-    header: 'STR fark',
-    cell: ({ getValue }) => String(getValue<number>()) + '%',
+    accessorKey: 'dosDiff',
+    header: 'DOS Farkı (gün)',
+    cell: ({ getValue }) => {
+      const v = getValue<number | null>();
+      return v != null ? `${v}g` : '∞';
+    },
   },
-  { accessorKey: 'appliedFilter', header: 'Filtre' },
+  { accessorKey: 'appliedFilter', header: 'Filter' },
   {
     accessorKey: 'isPrioritySource',
-    header: 'Kaynak',
-    cell: ({ getValue }) => (getValue<boolean>() ? 'Öncelikli' : 'Standart'),
+    header: 'Source',
+    cell: ({ getValue }) => (getValue<boolean>() ? 'Priority' : 'Standard'),
   },
 ];
 
 export function TransferTable(props: { rows: TransferSuggestion[] }) {
-  const [sorting, setSorting] = useState<SortingState>([{ id: 'strDiff', desc: true }]);
+  const [sorting, setSorting] = useState<SortingState>([{ id: 'dosDiff', desc: true }]);
 
   const table = useReactTable({
     data: props.rows,
@@ -50,7 +53,7 @@ export function TransferTable(props: { rows: TransferSuggestion[] }) {
   });
 
   if (props.rows.length === 0) {
-    return <div className="rf-inline-note">Transfer sonuçları burada listelenecek.</div>;
+    return <div className="rf-inline-note">Transfer results will be listed here.</div>;
   }
 
   return (

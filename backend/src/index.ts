@@ -15,7 +15,10 @@ import { storesRouter } from './routes/stores.js';
 import { strategiesRouter } from './routes/strategies.js';
 import { uploadRouter } from './routes/upload.js';
 import { visionRouter } from './routes/vision.js';
+import { calibrationRouter } from './routes/calibration.js';
+import { telegramTestRouter } from './routes/telegramTest.js';
 import { warmUpPythonVision, embedCatalogImages } from './services/pythonVision.js';
+import { startTelegramBot } from './services/telegramBot.js';
 import { catalogStore } from './store/catalogStore.js';
 
 const app = express();
@@ -59,6 +62,8 @@ app.use('/api/simulate', simulateRouter);
 app.use('/api/data', dataRouter);
 app.use('/api/upload', uploadRouter(upload));
 app.use('/api/vision', visionRouter(upload));
+app.use('/api/calibration', calibrationRouter(upload));
+app.use('/api/telegram-test', telegramTestRouter(upload));
 
 app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   const message = error instanceof Error ? error.message : 'Bilinmeyen hata';
@@ -69,6 +74,7 @@ app.listen(appConfig.port, () => {
   console.log(`RetailFlow API listening on :${appConfig.port}`);
   warmUpPythonVision();
   reEmbedCatalogIfNeeded();
+  void startTelegramBot();
 });
 
 const CLIP_DIM = 768;

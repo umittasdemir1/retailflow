@@ -28,5 +28,6 @@ export function useProducts() {
   return useQuery({
     queryKey: ['products'],
     queryFn: fetchProducts,
+    staleTime: Infinity,
   });
 }

@@ -1,31 +1,34 @@
-import { useState, useMemo } from 'react';
-import { Search, Star, MapPin } from 'lucide-react';
+import { useState, useMemo, useRef, useEffect } from 'react';
+import { Search, MapPin, ChartSpline, ShoppingCart, Box, Clock, Star, ListFilter } from 'lucide-react';
 import type { StoreMetrics } from '@retailflow/shared';
 
-/* ── STR Gauge (semicircle) ─────────────────────────────────────── */
+/* ── STR Gauge (pill) ───────────────────────────────────────────── */
 function StrGauge({ percent }: { percent: number }) {
-  const p = Math.max(0, Math.min(100, percent));
-  const R = 26; const cx = 32; const cy = 32;
-  const toRad = (d: number) => (d * Math.PI) / 180;
-  const needleAngle = -180 + (p / 100) * 180;
-  const fillEnd = { x: cx + R * Math.cos(toRad(needleAngle)), y: cy + R * Math.sin(toRad(needleAngle)) };
-  const largeArc = p > 50 ? 1 : 0;
-  const fillPath = p > 0 ? `M ${cx - R} ${cy} A ${R} ${R} 0 ${largeArc} 1 ${fillEnd.x} ${fillEnd.y}` : '';
-  const needleTip = { x: cx + (R - 5) * Math.cos(toRad(needleAngle)), y: cy + (R - 5) * Math.sin(toRad(needleAngle)) };
-  const color = p >= 70 ? '#059669' : p >= 50 ? '#1d4ed8' : p >= 30 ? '#d97706' : '#dc2626';
-  const label = p >= 70 ? 'Mükemmel' : p >= 50 ? 'İyi' : p >= 30 ? 'Normal' : 'Düşük';
+  const p         = Math.max(0, Math.min(100, percent));
+  const color     = '#16a34a';
+  const emptyColor = '#e8f5e9';
+  const TOTAL  = 25;
+  const filled = Math.round((p / 100) * TOTAL);
+  const R = 38; const CX = 50; const CY = 50;
+  const PW = 2.5; const PH = 16; const RX = 1.8;
+  const pills = Array.from({ length: TOTAL }, (_, i) => {
+    const deg = 180 - (i / (TOTAL - 1)) * 180;
+    const rad = (deg * Math.PI) / 180;
+    return { x: CX + R * Math.cos(rad), y: CY - R * Math.sin(rad), rot: 90 - deg, on: i < filled };
+  });
   return (
-    <div className="loc-gauge-wrap">
-      <svg width="64" height="38" viewBox="0 0 64 38" fill="none">
-        <path d={`M ${cx - R} ${cy} A ${R} ${R} 0 0 1 ${cx + R} ${cy}`} stroke="#e3e7ef" strokeWidth="4.5" fill="none" strokeLinecap="round" />
-        {fillPath && <path d={fillPath} stroke={color} strokeWidth="4.5" fill="none" strokeLinecap="round" />}
-        <circle cx={needleTip.x} cy={needleTip.y} r="3" fill={color} />
-        <circle cx={cx} cy={cy} r="2.5" fill="#8d9aab" />
+    <div className="prd-gauge-wrap">
+      <svg width="100" height="56" viewBox="0 0 100 56" fill="none">
+        {pills.map((pill, i) => (
+          <rect
+            key={i}
+            x={pill.x - PW / 2} y={pill.y - PH / 2}
+            width={PW} height={PH} rx={RX}
+            fill={pill.on ? color : emptyColor}
+            transform={`rotate(${pill.rot}, ${pill.x}, ${pill.y})`}
+          />
+        ))}
       </svg>
-      <div className="loc-gauge-info">
-        <span style={{ color, fontWeight: 600, fontSize: '0.78rem' }}>{label}</span>
-        <span className="loc-gauge-pct">%{p}</span>
-      </div>
     </div>
   );
 }
@@ -41,8 +44,8 @@ function InventoryBar({ sales, inventory }: { sales: number; inventory: number }
         <div className="loc-inv-bar-fill" style={{ width: `${salePct}%` }} />
       </div>
       <div className="loc-inv-bar-labels">
-        <span style={{ color: 'var(--green)' }}>{sales.toLocaleString('tr-TR')} sat.</span>
-        <span style={{ color: 'var(--ink-muted)' }}>{inventory.toLocaleString('tr-TR')} stok</span>
+        <span style={{ color: 'var(--green)' }}>{sales.toLocaleString('tr-TR')} sold</span>
+        <span style={{ color: 'var(--ink-muted)' }}>{inventory.toLocaleString('tr-TR')} stock</span>
       </div>
     </div>
   );
@@ -55,7 +58,7 @@ function CoverBadge({ days }: { days: number | null }) {
   const bg    = days <= 7 ? '#fef2f2' : days <= 30 ? '#fffbeb' : '#ecfdf5';
   return (
     <span className="loc-cover-badge" style={{ color, background: bg }}>
-      {Math.round(days)} gün
+      {Math.round(days)} days
     </span>
   );
 }
@@ -72,7 +75,7 @@ function StatCard({ label, value, sub, accent }: { label: string; value: string 
 }
 
 /* ── Main ───────────────────────────────────────────────────────── */
-type SortKey = 'name' | 'str' | 'sales' | 'inventory' | 'cover' | 'products';
+type SortKey = 'name' | 'str' | 'sales' | 'inventory' | 'cover';
 type SortDir = 'asc' | 'desc';
 
 interface Props {
@@ -80,10 +83,31 @@ interface Props {
   isLoading: boolean;
 }
 
+const PAGE_SIZE = 10;
+
 export function LocationsPage({ stores, isLoading }: Props) {
-  const [search, setSearch]   = useState('');
-  const [sortKey, setSortKey] = useState<SortKey>('str');
-  const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const [search, setSearch]     = useState('');
+  const [sortKey, setSortKey]   = useState<SortKey>('str');
+  const [sortDir, setSortDir]   = useState<SortDir>('desc');
+  const [page, setPage]         = useState(1);
+  const [sortOpen, setSortOpen] = useState(false);
+  const sortRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (sortRef.current && !sortRef.current.contains(e.target as Node)) setSortOpen(false);
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  const sortOptions: { key: SortKey; label: string }[] = [
+    { key: 'name',      label: 'Location Name' },
+    { key: 'str',       label: 'Performance' },
+    { key: 'sales',     label: 'Sales' },
+    { key: 'inventory', label: 'Stock' },
+    { key: 'cover',     label: 'Cover Days' },
+  ];
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
@@ -95,164 +119,199 @@ export function LocationsPage({ stores, isLoading }: Props) {
       if (sortKey === 'sales')     diff = a.totalSales - b.totalSales;
       if (sortKey === 'inventory') diff = a.totalInventory - b.totalInventory;
       if (sortKey === 'cover')     diff = (a.coverDays ?? 0) - (b.coverDays ?? 0);
-      if (sortKey === 'products')  diff = a.productCount - b.productCount;
       return sortDir === 'desc' ? -diff : diff;
     });
   }, [stores, search, sortKey, sortDir]);
 
+  const totalPages  = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const rows        = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
   function handleSort(key: SortKey) {
     if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
     else { setSortKey(key); setSortDir('desc'); }
+    setPage(1);
   }
 
-  const SortInd = ({ k }: { k: SortKey }) =>
-    sortKey === k ? <span className="prd-sort-indicator">{sortDir === 'desc' ? '↓' : '↑'}</span> : null;
-
-  // Stats
-  const totalSales     = stores.reduce((s, x) => s + x.totalSales, 0);
-  const totalInventory = stores.reduce((s, x) => s + x.totalInventory, 0);
-  const avgStr         = stores.length ? Math.round(stores.reduce((s, x) => s + x.strPercent, 0) / stores.length) : 0;
-  const bestStore      = stores.length ? [...stores].sort((a, b) => b.strPercent - a.strPercent)[0] : null;
-  const avgCover       = (() => {
+  const totalSales = stores.reduce((s, x) => s + x.totalSales, 0);
+  const avgStr     = stores.length ? Math.round(stores.reduce((s, x) => s + x.strPercent, 0) / stores.length) : 0;
+  const bestStore  = stores.length ? [...stores].sort((a, b) => b.strPercent - a.strPercent)[0] : null;
+  const avgCover   = (() => {
     const valid = stores.filter((s) => s.coverDays != null);
     return valid.length ? Math.round(valid.reduce((s, x) => s + (x.coverDays ?? 0), 0) / valid.length) : null;
   })();
-
   const strColor = avgStr >= 70 ? '#059669' : avgStr >= 50 ? '#1d4ed8' : avgStr >= 30 ? '#d97706' : '#dc2626';
 
   return (
     <div className="rf-page">
+
       {/* Header */}
       <div className="rf-page-header">
         <div>
-          <p className="rf-page-eyebrow">Mağaza Ağı</p>
-          <h1 className="rf-page-title">Lokasyonlar</h1>
-          <p className="rf-page-subtitle">
-            {stores.length > 0 ? `${stores.length} lokasyonun satış ve stok performansı` : 'Lokasyon performans tablosu'}
-          </p>
+          <p className="rf-page-eyebrow">Store Network</p>
+          <h1 className="rf-page-title">Locations</h1>
         </div>
-        <div className="prd-search-wrap">
-          <Search size={15} className="prd-search-icon" />
-          <input
-            className="prd-search-input"
-            type="text"
-            placeholder="Lokasyon ara..."
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); }}
-          />
+        <div className="prd-header-actions">
+          <div className="prd-search-wrap">
+            <Search size={15} className="prd-search-icon" />
+            <input
+              className="prd-search-input"
+              type="text"
+              placeholder="Search location..."
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            />
+          </div>
+          <div className="prd-sort-wrap" ref={sortRef}>
+            <button className="prd-sort-btn" onClick={() => setSortOpen((o) => !o)}>
+              <ListFilter size={15} strokeWidth={1.8} />
+              <span>Sort By</span>
+            </button>
+            {sortOpen && (
+              <div className="prd-sort-dropdown">
+                {sortOptions.map((opt) => (
+                  <button
+                    key={opt.key}
+                    className={`prd-sort-option${sortKey === opt.key ? ' is-active' : ''}`}
+                    onClick={() => { handleSort(opt.key); setSortOpen(false); }}
+                  >
+                    {opt.label}
+                    {sortKey === opt.key && <span className="prd-sort-dir">{sortDir === 'desc' ? '↓' : '↑'}</span>}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Stat Bar */}
       <div className="prd-stat-bar">
-        <StatCard label="Toplam Lokasyon" value={stores.length} sub="aktif mağaza" />
-        <StatCard
-          label="En İyi Performans"
-          value={bestStore?.name ?? '—'}
-          sub={bestStore ? `STR %${bestStore.strPercent}` : undefined}
-          accent="#1d4ed8"
-        />
-        <StatCard
-          label="Ortalama STR"
-          value={`%${avgStr}`}
-          sub={avgStr >= 70 ? 'Mükemmel' : avgStr >= 50 ? 'İyi' : avgStr >= 30 ? 'Normal' : 'Düşük'}
-          accent={strColor}
-        />
-        <StatCard label="Toplam Satış" value={totalSales.toLocaleString('tr-TR')} sub="adet" />
-        <StatCard
-          label="Ort. Cover Days"
-          value={avgCover != null ? `${avgCover} gün` : '—'}
-          sub="stok kapama süresi"
-        />
+        <StatCard label="Total Locations"   value={stores.length} sub="active stores" />
+        <StatCard label="Top Performance"   value={bestStore?.name ?? '—'} sub={bestStore ? `STR %${bestStore.strPercent}` : undefined} accent="#1d4ed8" />
+        <StatCard label="Avg. STR"          value={`%${avgStr}`} sub={avgStr >= 70 ? 'Excellent' : avgStr >= 50 ? 'Good' : avgStr >= 30 ? 'Normal' : 'Low'} accent={strColor} />
+        <StatCard label="Total Sales"       value={totalSales.toLocaleString('tr-TR')} sub="items" />
+        <StatCard label="Avg. Cover Days"   value={avgCover != null ? `${avgCover} days` : '—'} sub="inventory coverage" />
       </div>
 
       {/* Table */}
       <div className="prd-table-card">
-        <div className="prd-table-toolbar">
-          <span className="prd-table-count">
-            {filtered.length} lokasyon{search ? ` · "${search}" için` : ''}
-          </span>
-        </div>
-
         <div className="rf-table-wrap">
           <table className="rf-table loc-table">
-            <thead>
-              <tr>
-                <th style={{ width: 36 }}>#</th>
-                <th className="prd-th-sortable" onClick={() => handleSort('name')}>
-                  Lokasyon <SortInd k="name" />
-                </th>
-                <th className="prd-th-sortable" onClick={() => handleSort('str')}>
-                  STR Performans <SortInd k="str" />
-                </th>
-                <th className="prd-th-sortable" onClick={() => handleSort('sales')}>
-                  Satış / Stok Dağılımı <SortInd k="sales" />
-                </th>
-                <th className="prd-th-sortable" onClick={() => handleSort('inventory')}>
-                  Stok <SortInd k="inventory" />
-                </th>
-                <th className="prd-th-sortable" onClick={() => handleSort('products')}>
-                  Ürün <SortInd k="products" />
-                </th>
-                <th className="prd-th-sortable" onClick={() => handleSort('cover')}>
-                  Cover Days <SortInd k="cover" />
-                </th>
-                <th>Tür</th>
-              </tr>
-            </thead>
             <tbody>
               {isLoading && (
-                <tr><td colSpan={8} className="prd-loading-cell">Yükleniyor...</td></tr>
+                <tr><td colSpan={11} className="prd-loading-cell">Loading...</td></tr>
               )}
-              {!isLoading && filtered.length === 0 && (
+              {!isLoading && rows.length === 0 && (
                 <tr>
-                  <td colSpan={8} style={{ padding: 0 }}>
+                  <td colSpan={11} style={{ padding: 0 }}>
                     <div className="prd-empty">
-                      <MapPin size={36} strokeWidth={1.2} />
-                      <p>{stores.length === 0 ? 'Henüz veri yüklenmedi.' : 'Arama ile eşleşen lokasyon bulunamadı.'}</p>
+                      <MapPin size={40} strokeWidth={1.2} />
+                      <p>{stores.length === 0 ? 'No data loaded yet.' : 'No locations match your search.'}</p>
                     </div>
                   </td>
                 </tr>
               )}
-              {filtered.map((store, i) => (
-                <tr key={store.name}>
-                  <td><span className="prd-row-num">{i + 1}</span></td>
-                  <td>
-                    <div className="loc-name-cell">
-                      <strong>{store.name}</strong>
-                      {store.isPrioritySource && (
-                        <span className="loc-priority-dot" title="Öncelikli kaynak">
-                          <Star size={11} fill="currentColor" />
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td><StrGauge percent={store.strPercent} /></td>
-                  <td><InventoryBar sales={store.totalSales} inventory={store.totalInventory} /></td>
-                  <td>
-                    <strong>{store.totalInventory.toLocaleString('tr-TR')}</strong>
-                    <small>
-                      {store.excessInventory > 0
-                        ? `${store.excessInventory.toLocaleString('tr-TR')} fazla`
-                        : 'dengeli'}
-                    </small>
-                  </td>
-                  <td>
-                    <strong>{store.productCount.toLocaleString('tr-TR')}</strong>
-                    <small>SKU</small>
-                  </td>
-                  <td><CoverBadge days={store.coverDays} /></td>
-                  <td>
-                    <span className={`prd-badge ${store.isPrioritySource ? 'prd-badge-blue' : 'prd-badge-green'}`}>
-                      {store.isPrioritySource ? 'Merkez/Online' : 'Mağaza'}
-                    </span>
-                  </td>
-                </tr>
+              {rows.map((store) => (
+                <LocationRow key={store.name} store={store} />
               ))}
             </tbody>
           </table>
         </div>
+
+        {totalPages > 1 && (
+          <div className="prd-pagination">
+            <button type="button" className="prd-page-btn" disabled={currentPage === 1} onClick={() => setPage((p) => p - 1)}>
+              ← Previous
+            </button>
+            <span className="prd-page-info">
+              Page {currentPage} / {totalPages}
+              <span style={{ color: 'var(--ink-muted)', marginLeft: 8 }}>({filtered.length.toLocaleString('tr-TR')} locations)</span>
+            </span>
+            <button type="button" className="prd-page-btn" disabled={currentPage === totalPages} onClick={() => setPage((p) => p + 1)}>
+              Next →
+            </button>
+          </div>
+        )}
       </div>
     </div>
+  );
+}
+
+/* ── Location Row ───────────────────────────────────────────────── */
+function LocationRow({ store }: { store: StoreMetrics }) {
+  const strLevel = store.strPercent >= 70 ? 'Excellent' : store.strPercent >= 50 ? 'Good' : store.strPercent >= 30 ? 'Normal' : 'Low';
+
+  return (
+    <tr>
+      {/* Location */}
+      <td>
+        <strong className="loc-name-cell">
+          {store.name.toUpperCase()}
+          {store.isPrioritySource && (
+            <span className="loc-priority-dot" title="Priority source" style={{ marginLeft: 6 }}>
+              <Star size={11} fill="currentColor" />
+            </span>
+          )}
+        </strong>
+      </td>
+
+      <td className="prd-col-sep"><span>|</span></td>
+
+      {/* STR Performance */}
+      <td className="prd-perf-td">
+        <div className="prd-perf-cell">
+          <div className="prd-perf-info">
+            <strong className="prd-perf-title">
+              Performance <span className="prd-perf-label">{strLevel}</span>
+            </strong>
+            <div className="prd-perf-stats">
+              <ChartSpline size={18} strokeWidth={1.8} />
+              <span>%{store.strPercent}</span>
+              <span className="prd-perf-sep">|</span>
+              <ShoppingCart size={18} strokeWidth={1.8} />
+              <span>{store.totalSales.toLocaleString('tr-TR')}</span>
+            </div>
+          </div>
+          <StrGauge percent={store.strPercent} />
+        </div>
+      </td>
+
+      <td className="prd-col-sep"><span>|</span></td>
+
+      {/* Sales / Stock */}
+      <td className="prd-stock-cell">
+        <div className="prd-stock-info">
+          <strong className="prd-perf-title">Sales / Stock</strong>
+          <InventoryBar sales={store.totalSales} inventory={store.totalInventory} />
+        </div>
+      </td>
+
+      <td className="prd-col-sep"><span>|</span></td>
+
+      {/* Inventory */}
+      <td>
+        <div className="prd-stock-info">
+          <strong className="prd-perf-title">Stock</strong>
+          <div className="prd-perf-stats">
+            <Box size={18} strokeWidth={1.8} />
+            <span>{store.totalInventory.toLocaleString('tr-TR')}</span>
+          </div>
+        </div>
+      </td>
+
+      <td className="prd-col-sep"><span>|</span></td>
+
+      {/* Cover Days */}
+      <td>
+        <div className="prd-stock-info">
+          <strong className="prd-perf-title">Cover Days</strong>
+          <div className="prd-perf-stats">
+            <Clock size={18} strokeWidth={1.8} />
+            <CoverBadge days={store.coverDays} />
+          </div>
+        </div>
+      </td>
+    </tr>
   );
 }

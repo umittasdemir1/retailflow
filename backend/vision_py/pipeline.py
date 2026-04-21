@@ -66,6 +66,10 @@ MATCH_MIN_SCORE  = 0.70
 MATCH_MIN_MARGIN = 0.04
 TOP_K            = 5
 
+# Kalibrasyonlu mod için daha sıkı eşik (tek ürün kataloğunda false positive engeller)
+CALIB_MIN_SCORE  = 0.80
+CALIB_MIN_MARGIN = 0.04
+
 # ─── Görsel ön işleme parametreleri ──────────────────────────────────────────
 FULL_IMAGE_CLAHE_CLIP = 2.4
 CROP_IMAGE_CLAHE_CLIP = 3.2
@@ -703,6 +707,159 @@ def cmd_status(_: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def cmd_recognize_calibrated(payload: dict[str, Any]) -> dict[str, Any]:
+    """
+    Kalibrasyon tabanlı tanıma: YOLO atlat, elle çizilmiş slot dikdörtgenlerini kullan.
+
+    payload:
+      imagePath : str
+      slots     : [{x, y, width, height}, ...]   — kullanıcının çizdiği ürün alanları
+      dots      : [{x, y}, ...]                  — kullanıcının işaretlediği dot pozisyonları
+      catalog   : [{id, productCode, productName, color, description, featureVector, featureVectors}, ...]
+    """
+    image_path = payload['imagePath']
+    slots      = payload['slots']       # list of {x,y,width,height}
+    dots       = payload.get('dots', [])
+    catalog    = payload['catalog']
+    started    = time.time()
+
+    _log(f'Kalibrasyonlu tanıma: {len(slots)} slot, görsel: {image_path}')
+    _log(f'Katalog: {len(catalog)} ürün')
+
+    image = pil_to_rgb(image_path)
+    image_width, image_height = image.size
+
+    index, vec_to_product = build_multi_vector_index(catalog)
+    total_vecs = index.ntotal
+
+    matched: list[dict[str, Any]] = []
+
+    for slot_idx, slot in enumerate(slots):
+        # Slot koordinatlarını tam sayıya çevir ve sınır içine al
+        sx = max(0, int(round(slot['x'])))
+        sy = max(0, int(round(slot['y'])))
+        sw = int(round(slot['width']))
+        sh = int(round(slot['height']))
+        sx2 = min(image_width,  sx + sw)
+        sy2 = min(image_height, sy + sh)
+
+        if sx2 <= sx or sy2 <= sy:
+            _log(f'  slot{slot_idx}: Geçersiz boyut, atlandı')
+            continue
+
+        # Sadece slot alanını kırp — orijinal piksel kalitesi korunur
+        crop_img = image.crop((sx, sy, sx2, sy2))
+
+        # Embed — ham piksel, preprocessing yok
+        emb = _encode_image(crop_img)
+        norm = np.linalg.norm(emb)
+        emb = emb / norm if norm > 0 else emb
+
+        k = min(total_vecs, TOP_K * 5)
+        distances, indices = index.search(np.expand_dims(emb, axis=0), k)
+
+        # Multi-vector: her ürün için en iyi skoru al
+        product_best: dict[int, float] = {}
+        for score, vec_idx in zip(distances[0].tolist(), indices[0].tolist()):
+            if vec_idx < 0:
+                continue
+            cat_idx = vec_to_product[vec_idx]
+            if cat_idx not in product_best or score > product_best[cat_idx]:
+                product_best[cat_idx] = score
+
+        sorted_products = sorted(product_best.items(), key=lambda x: x[1], reverse=True)
+
+        top_matches: list[dict[str, Any]] = []
+        scores:      list[float]          = []
+        for cat_idx, score in sorted_products[:TOP_K]:
+            item = catalog[cat_idx]
+            top_matches.append({
+                'catalogProductId': item['id'],
+                'productCode':      item['productCode'],
+                'productName':      item['productName'],
+                'color':            item.get('color', ''),
+                'score':            float(score),
+            })
+            scores.append(float(score))
+
+        if not top_matches:
+            _log(f'  slot{slot_idx}: FAISS sonuç yok, atlandı')
+            continue
+
+        margin = best_margin(scores, top_matches)
+        best   = top_matches[0]
+
+        top3_str = '  |  '.join(
+            f'{m["productCode"]}={m["score"]:.4f}' for m in top_matches[:3]
+        )
+        _log(f'  slot{slot_idx} → {best["productCode"]} [{best.get("color","")}] '
+             f'score={best["score"]:.4f} margin={margin:.4f} | {top3_str}')
+
+        if best['score'] < CALIB_MIN_SCORE:
+            _log(f'  slot{slot_idx}: REDDEDİLDİ — score {best["score"]:.4f} < {CALIB_MIN_SCORE}')
+            continue
+        if len(top_matches) > 1 and margin < CALIB_MIN_MARGIN:
+            _log(f'  slot{slot_idx}: REDDEDİLDİ — margin {margin:.4f} < {CALIB_MIN_MARGIN}')
+            continue
+
+        _log(f'  slot{slot_idx}: ONAYLANDI → {best["productCode"]} | {best.get("color","")} | score={best["score"]:.4f}')
+
+        # Dot pozisyonu: kalibrasyon noktası varsa onu kullan, yoksa slot merkezi
+        if slot_idx < len(dots):
+            dot_pos = {'x': int(round(dots[slot_idx]['x'])), 'y': int(round(dots[slot_idx]['y']))}
+        else:
+            dot_pos = {'x': sx + (sx2 - sx) // 2, 'y': sy + (sy2 - sy) // 2}
+
+        candidate = {
+            'catalogProductId':  best['catalogProductId'],
+            'productCode':       best['productCode'],
+            'productName':       best['productName'],
+            'color':             best.get('color', ''),
+            'confidence':        round(best['score'] * 100),
+            'boundingBox':       {'x': sx, 'y': sy, 'width': sx2 - sx, 'height': sy2 - sy},
+            'dotPosition':       dot_pos,
+            'detectorConfidence': round(best['score'] * 100),
+            'detectorClass':      'calibrated_slot',
+            'margin':             round(margin, 4),
+            'slotIndex':          slot_idx,
+            '_score':             best['score'],
+            '_margin':            margin,
+            'topMatches':         [{
+                'catalogProductId': m['catalogProductId'],
+                'productCode':      m['productCode'],
+                'productName':      m['productName'],
+                'score':            round(m['score'], 4),
+            } for m in top_matches],
+        }
+
+        # Aynı ürün birden fazla slotta eşleştiyse sadece en iyisini tut
+        existing_idx = next(
+            (j for j, m in enumerate(matched) if m['catalogProductId'] == candidate['catalogProductId']),
+            None,
+        )
+        if existing_idx is None:
+            matched.append(candidate)
+        else:
+            current = matched[existing_idx]
+            if candidate['_score'] > current['_score']:
+                matched[existing_idx] = candidate
+
+    # Geçici score alanlarını temizle
+    for m in matched:
+        m.pop('_score', None)
+        m.pop('_margin', None)
+
+    clip_name = CLIP_MODEL_ID.split('/')[-1]
+    return {
+        'imageWidth':       image_width,
+        'imageHeight':      image_height,
+        'processingTimeMs': round((time.time() - started) * 1000),
+        'scannedRegions':   len(slots),
+        'modelVersion':     f'calibrated+{clip_name}+faiss',
+        'detections':       matched,
+    }
+
+
 def cmd_embed(payload: dict[str, Any]) -> dict[str, Any]:
     """
     Katalog embed komutu.
@@ -743,6 +900,8 @@ def main() -> int:
             response = cmd_embed(payload)
         elif command == 'recognize':
             response = recognize(payload)
+        elif command == 'recognize_calibrated':
+            response = cmd_recognize_calibrated(payload)
         else:
             raise ValueError(f'Bilinmeyen komut: {command}')
 

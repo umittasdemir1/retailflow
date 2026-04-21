@@ -1,7 +1,7 @@
 import { DEFAULT_PRIORITY_SOURCES, type InventoryRecord, type StoreMetrics } from '@retailflow/shared';
 import { computeCoverDays, computeSalesVelocity, computeStr } from './strCalculator.js';
 
-export function computeStoreMetrics(records: InventoryRecord[], prioritySources = DEFAULT_PRIORITY_SOURCES): StoreMetrics[] {
+export function computeStoreMetrics(records: InventoryRecord[], prioritySources = DEFAULT_PRIORITY_SOURCES, analysisDays = 30): StoreMetrics[] {
   const grouped = new Map<string, { totalSales: number; totalInventory: number; products: Set<string> }>();
 
   for (const record of records) {
@@ -19,7 +19,7 @@ export function computeStoreMetrics(records: InventoryRecord[], prioritySources 
 
   return Array.from(grouped.entries()).map(([name, metrics]) => {
     const strRate = computeStr(metrics.totalSales, metrics.totalInventory);
-    const coverDays = computeCoverDays(metrics.totalInventory, computeSalesVelocity(metrics.totalSales));
+    const coverDays = computeCoverDays(metrics.totalInventory, computeSalesVelocity(metrics.totalSales, analysisDays));
 
     return {
       name,

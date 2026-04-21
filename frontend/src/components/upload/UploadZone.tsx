@@ -18,8 +18,8 @@ export function UploadZone(props: { isUploading: boolean; uploadInfo: UploadResu
       }}
     >
       <div>
-        <strong>CSV veya Excel dosyasını buraya bırak</strong>
-        <p>Tekstil mağazaları arası stok transfer verisi için .csv, .xls veya .xlsx yükleyebilirsin.</p>
+        <strong>Drop your CSV or Excel file here</strong>
+        <p>Upload .csv, .xls or .xlsx inventory transfer data for retail stores.</p>
       </div>
       <label className="rf-upload-button">
         <input
@@ -31,14 +31,14 @@ export function UploadZone(props: { isUploading: boolean; uploadInfo: UploadResu
           }}
         />
         <img src={fileIcon} alt="" width={18} height={18} style={{ flexShrink: 0 }} />
-        {props.isUploading ? 'Yükleniyor...' : 'Dosya Seç'}
+        {props.isUploading ? 'Uploading...' : 'Choose File'}
       </label>
       <div className="rf-upload-meta">
-        <span>{props.uploadInfo?.fileName ?? 'Henüz dosya yok'}</span>
+        <span>{props.uploadInfo?.fileName ?? 'No file yet'}</span>
         <small>
           {props.uploadInfo
-            ? props.uploadInfo.storeCount + ' mağaza · ' + props.uploadInfo.rowCount + ' satır'
-            : 'Analiz için önce veri yükleyin'}
+            ? props.uploadInfo.storeCount + ' stores · ' + props.uploadInfo.rowCount + ' rows'
+            : 'Upload data to start analysis'}
         </small>
       </div>
     </div>
