@@ -22,6 +22,9 @@ import { ProductsPage } from './components/products/ProductsPage';
 import { LocationsPage } from './components/locations/LocationsPage';
 import { VisionPage } from './components/vision/VisionPage';
 import { GuidePage } from './components/guide/GuidePage';
+import { SeriesPage } from './components/allocation/SeriesPage';
+import { AssortmentPage } from './components/allocation/AssortmentPage';
+import { AllocationPage } from './components/allocation/AllocationPage';
 import { SummaryPanel } from './components/results/SummaryPanel';
 import { SimulationPanel } from './components/results/SimulationPanel';
 import { TransferTable } from './components/results/TransferTable';
@@ -379,6 +382,15 @@ export default function App() {
 
         {/* ─── GUIDE ─── */}
         {activePage === 'guide' && <GuidePage />}
+
+        {/* ─── SERIES ─── */}
+        {activePage === 'series' && <SeriesPage />}
+
+        {/* ─── ASSORTMENT ─── */}
+        {activePage === 'assortment' && <AssortmentPage />}
+
+        {/* ─── ALLOCATIONS ─── */}
+        {activePage === 'allocations' && <AllocationPage />}
 
       </AppShell>
     </>

@@ -293,3 +293,65 @@ export function calibrationImageUrl(id: string): string {
   const base = import.meta.env.VITE_API_BASE_URL ? `${import.meta.env.VITE_API_BASE_URL}/api` : '/api';
   return `${base}/calibration/${id}/image`;
 }
+
+// ─── Allocation API ──────────────────────────────────────────────────────────
+
+export type { Series, AssortmentRule, StoreAllocation } from '@retailflow/shared';
+import type { Series, AssortmentRule, StoreAllocation } from '@retailflow/shared';
+
+export async function fetchSeries(): Promise<Series[]> {
+  const r = await api.get<{ ok: boolean; data: Series[] }>('/allocation/series');
+  return r.data.data;
+}
+
+export async function createSeries(data: { name: string; sizes: Record<string, number> }): Promise<Series> {
+  const r = await api.post<{ ok: boolean; data: Series }>('/allocation/series', data);
+  return r.data.data;
+}
+
+export async function updateSeries(id: string, data: Partial<{ name: string; sizes: Record<string, number> }>): Promise<Series> {
+  const r = await api.put<{ ok: boolean; data: Series }>(`/allocation/series/${id}`, data);
+  return r.data.data;
+}
+
+export async function deleteSeries(id: string): Promise<void> {
+  await api.delete(`/allocation/series/${id}`);
+}
+
+export async function fetchAssortmentRules(): Promise<AssortmentRule[]> {
+  const r = await api.get<{ ok: boolean; data: AssortmentRule[] }>('/allocation/assortment');
+  return r.data.data;
+}
+
+export async function createAssortmentRule(data: { type: 'product' | 'category'; targetName: string; seriesId: string }): Promise<AssortmentRule> {
+  const r = await api.post<{ ok: boolean; data: AssortmentRule }>('/allocation/assortment', data);
+  return r.data.data;
+}
+
+export async function deleteAssortmentRule(id: string): Promise<void> {
+  await api.delete(`/allocation/assortment/${id}`);
+}
+
+export async function fetchAllocations(): Promise<StoreAllocation[]> {
+  const r = await api.get<{ ok: boolean; data: StoreAllocation[] }>('/allocation/allocations');
+  return r.data.data;
+}
+
+export async function createAllocation(data: Omit<StoreAllocation, 'id' | 'createdAt'>): Promise<StoreAllocation> {
+  const r = await api.post<{ ok: boolean; data: StoreAllocation }>('/allocation/allocations', data);
+  return r.data.data;
+}
+
+export async function updateAllocation(id: string, data: Partial<Omit<StoreAllocation, 'id' | 'createdAt'>>): Promise<StoreAllocation> {
+  const r = await api.put<{ ok: boolean; data: StoreAllocation }>(`/allocation/allocations/${id}`, data);
+  return r.data.data;
+}
+
+export async function deleteAllocation(id: string): Promise<void> {
+  await api.delete(`/allocation/allocations/${id}`);
+}
+
+export async function bulkUpsertAllocations(items: Omit<StoreAllocation, 'id' | 'createdAt'>[]): Promise<StoreAllocation[]> {
+  const r = await api.post<{ ok: boolean; data: StoreAllocation[] }>('/allocation/allocations/bulk', { items });
+  return r.data.data;
+}

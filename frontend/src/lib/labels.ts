@@ -4,6 +4,7 @@ const TRANSFER_TYPE_LABELS: Record<TransferType, string> = {
   global: 'Global',
   targeted: 'Targeted',
   size_completion: 'Size Completion',
+  allocation: 'Tahsisat',
 };
 
 const STRATEGY_LABELS: Record<RetailFlowStrategy, string> = {

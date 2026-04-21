@@ -14,9 +14,12 @@ import {
   ChevronsRight,
   Menu,
   X,
+  Layers,
+  List,
+  Store,
 } from 'lucide-react';
 
-export type ActivePage = 'dashboard' | 'upload' | 'products' | 'locations' | 'analysis' | 'results' | 'vision' | 'guide';
+export type ActivePage = 'dashboard' | 'upload' | 'products' | 'locations' | 'analysis' | 'results' | 'vision' | 'guide' | 'series' | 'assortment' | 'allocations';
 
 interface NavItem {
   id: ActivePage;
@@ -32,7 +35,10 @@ const NAV: NavItem[] = [
   { id: 'analysis',  icon: <BarChart3 size={24} strokeWidth={1.7} />,       label: 'Analysis' },
   { id: 'results',   icon: <ArrowLeftRight size={24} strokeWidth={1.7} />,  label: 'Results' },
   { id: 'vision',    icon: <ScanSearch size={24} strokeWidth={1.7} />,      label: 'Visual Search' },
-  { id: 'guide',     icon: <BookOpen size={24} strokeWidth={1.7} />,       label: 'Strateji Rehberi' },
+  { id: 'guide',       icon: <BookOpen size={24} strokeWidth={1.7} />,       label: 'Strateji Rehberi' },
+  { id: 'series',      icon: <Layers size={24} strokeWidth={1.7} />,         label: 'Seriler' },
+  { id: 'assortment',  icon: <List size={24} strokeWidth={1.7} />,           label: 'Asorti Kuralları' },
+  { id: 'allocations', icon: <Store size={24} strokeWidth={1.7} />,          label: 'Tahsisatlar' },
 ];
 
 interface Props {

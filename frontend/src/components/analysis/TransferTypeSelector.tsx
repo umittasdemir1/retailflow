@@ -4,6 +4,7 @@ const MODES: { key: AnalyzeRequest['transferType']; label: string }[] = [
   { key: 'global', label: 'Global' },
   { key: 'targeted', label: 'Targeted' },
   { key: 'size_completion', label: 'Size Completion' },
+  { key: 'allocation', label: 'Tahsisat' },
 ];
 
 export function TransferTypeSelector(props: {

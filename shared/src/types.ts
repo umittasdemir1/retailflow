@@ -1,5 +1,43 @@
 export type RetailFlowStrategy = 'sakin' | 'kontrollu' | 'agresif' | 'custom';
-export type TransferType = 'global' | 'targeted' | 'size_completion';
+export type TransferType = 'global' | 'targeted' | 'size_completion' | 'allocation';
+
+// ─── Allocation System ────────────────────────────────────────────────────────
+
+export interface Series {
+  id: string;
+  name: string;
+  sizes: Record<string, number>; // { S: 1, M: 3, L: 3, XL: 1 }
+  createdAt: string;
+}
+
+export interface AssortmentRule {
+  id: string;
+  type: 'product' | 'category';
+  targetName: string;
+  seriesId: string;
+  createdAt: string;
+}
+
+export interface StoreAllocation {
+  id: string;
+  storeName: string;
+  productName: string;
+  color: string;
+  seriesId: string;
+  seriesCount: number;
+  enabled: boolean;
+  createdAt: string;
+}
+
+export interface AllocationDeficit {
+  storeName: string;
+  productName: string;
+  color: string;
+  size: string;
+  targetQty: number;
+  currentQty: number;
+  deficitQty: number;
+}
 
 export interface StrategyConfig {
   name: RetailFlowStrategy;
@@ -83,6 +121,10 @@ export interface TransferSuggestion {
   maxStr?: number;
   salesDiff?: number;
   inventoryDiff?: number;
+  // Allocation mode fields
+  allocationTargetQty?: number;
+  allocationCurrentQty?: number;
+  allocationDeficitQty?: number;
 }
 
 export interface RejectedTransfer {
@@ -150,6 +192,8 @@ export interface AnalyzeRequest {
   includedCategories?: string[];
   groupingMode?: 'name' | 'sku';
   customConfig?: Partial<StrategyConfig>;
+  // Allocation mode
+  useAllocation?: boolean;
 }
 
 export interface ExportRequest {
