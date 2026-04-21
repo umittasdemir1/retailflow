@@ -1,127 +1,105 @@
-import { useState, useMemo } from 'react';
-import { Panel } from '../ui/Panel';
+import { useState, useMemo, useCallback } from 'react';
 import { useSeries, useAllocations, useAllocationMutations, type StoreAllocation } from '../../hooks/useAllocation';
 import { useStores, useProducts } from '../../hooks/useStores';
-import { Plus, Trash2, ToggleLeft, ToggleRight } from 'lucide-react';
+import { ToggleLeft, ToggleRight } from 'lucide-react';
 
-function AllocationRow({
-  alloc,
-  seriesName,
-  onToggle,
-  onDelete,
-  onSeriesCountChange,
-}: {
-  alloc: StoreAllocation;
-  seriesName: string;
-  onToggle: () => void;
-  onDelete: () => void;
-  onSeriesCountChange: (count: number) => void;
-}) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderBottom: '1px solid var(--line-strong)', fontSize: '0.84rem' }}>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ fontWeight: 600, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {alloc.productName}
-        </p>
-        <p style={{ color: 'var(--ink-soft)', marginTop: 1, fontSize: '0.76rem' }}>
-          {alloc.color}
-        </p>
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-        <span style={{ fontSize: '0.75rem', color: 'var(--ink-muted)' }}>{seriesName}</span>
-        <span style={{ fontSize: '0.75rem', color: 'var(--ink-soft)' }}>×</span>
-        <input
-          type="number"
-          min={1}
-          step={1}
-          value={alloc.seriesCount}
-          onChange={(e) => onSeriesCountChange(Number(e.target.value))}
-          style={{ width: 46, textAlign: 'center', padding: '3px 5px', borderRadius: 5, border: '1px solid var(--line-strong)', background: 'var(--surface)', color: 'var(--ink)', fontSize: '0.83rem' }}
-        />
-      </div>
-      <button type="button" onClick={onToggle} title={alloc.enabled ? 'Devre dışı bırak' : 'Etkinleştir'} style={{ color: alloc.enabled ? 'var(--accent)' : 'var(--ink-muted)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-        {alloc.enabled ? <ToggleRight size={20} /> : <ToggleLeft size={20} />}
-      </button>
-      <button type="button" className="rf-icon-btn rf-icon-btn--danger" title="Sil" onClick={onDelete}>
-        <Trash2 size={14} />
-      </button>
-    </div>
-  );
+interface TableRow {
+  storeName: string;
+  productName: string;
+  color: string;
+  allocation: StoreAllocation | null;
+}
+
+function useDebounce<T extends (...args: never[]) => void>(fn: T, ms: number): T {
+  let timer: ReturnType<typeof setTimeout>;
+  return ((...args: Parameters<T>) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), ms);
+  }) as T;
 }
 
 export function AllocationPage() {
-  const { data: allocations = [], isLoading } = useAllocations();
+  const { data: allocations = [], isLoading: allocLoading } = useAllocations();
   const { data: series = [] } = useSeries();
   const { data: stores = [] } = useStores();
   const { data: productsData } = useProducts();
-  const { add, update, remove } = useAllocationMutations();
+  const { add, update } = useAllocationMutations();
 
-  const [storeName, setStoreName] = useState('');
-  const [productName, setProductName] = useState('');
-  const [color, setColor] = useState('');
-  const [seriesId, setSeriesId] = useState('');
-  const [seriesCount, setSeriesCount] = useState(1);
-  const [filter, setFilter] = useState('');
+  const [storeFilter, setStoreFilter] = useState('');
+  const [productFilter, setProductFilter] = useState('');
+  const [onlyActive, setOnlyActive] = useState(false);
 
   const storeNames = useMemo(() => stores.map((s) => s.name).sort(), [stores]);
-
   const products = productsData?.products ?? [];
 
-  const productNames = useMemo(
-    () => [...new Set(products.map((p) => p.productName))].sort(),
-    [products],
+  // All product × color combinations
+  const productColors = useMemo(() => {
+    const rows: { productName: string; color: string }[] = [];
+    for (const p of products) {
+      for (const c of p.colors) {
+        rows.push({ productName: p.productName, color: c });
+      }
+    }
+    return rows;
+  }, [products]);
+
+  // Allocation lookup map: storeName|||productName|||color → StoreAllocation
+  const allocMap = useMemo(() => {
+    const map = new Map<string, StoreAllocation>();
+    for (const a of allocations) {
+      map.set(`${a.storeName}|||${a.productName}|||${a.color}`, a);
+    }
+    return map;
+  }, [allocations]);
+
+  // Full matrix filtered by store + product search + onlyActive
+  const rows = useMemo((): TableRow[] => {
+    if (!storeFilter) return [];
+    const pq = productFilter.toLowerCase();
+    return productColors
+      .filter((pc) => !pq || pc.productName.toLowerCase().includes(pq) || pc.color.toLowerCase().includes(pq))
+      .map((pc) => ({
+        storeName: storeFilter,
+        productName: pc.productName,
+        color: pc.color,
+        allocation: allocMap.get(`${storeFilter}|||${pc.productName}|||${pc.color}`) ?? null,
+      }))
+      .filter((r) => !onlyActive || r.allocation?.enabled === true);
+  }, [storeFilter, productFilter, onlyActive, productColors, allocMap]);
+
+  function getAllocationState(row: TableRow) {
+    return {
+      enabled: row.allocation?.enabled ?? false,
+      seriesId: row.allocation?.seriesId ?? '',
+      seriesCount: row.allocation?.seriesCount ?? 1,
+    };
+  }
+
+  function saveRow(row: TableRow, patch: Partial<Omit<StoreAllocation, 'id' | 'createdAt'>>) {
+    if (row.allocation) {
+      update.mutate({ id: row.allocation.id, data: patch });
+    } else {
+      add.mutate({
+        storeName: row.storeName,
+        productName: row.productName,
+        color: row.color,
+        seriesId: patch.seriesId ?? '',
+        seriesCount: patch.seriesCount ?? 1,
+        enabled: patch.enabled ?? false,
+        ...patch,
+      });
+    }
+  }
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const debouncedSave = useCallback(
+    useDebounce((row: TableRow, patch: Partial<Omit<StoreAllocation, 'id' | 'createdAt'>>) => {
+      saveRow(row, patch);
+    }, 600),
+    [allocations],
   );
 
-  const colorsForProduct = useMemo(() => {
-    if (!productName) return [];
-    return [...new Set(products.filter((p) => p.productName === productName).map((p) => p.colors).flat())].sort();
-  }, [products, productName]);
-
-  function handleProductChange(name: string) {
-    setProductName(name);
-    setColor('');
-  }
-
-  function handleAdd() {
-    if (!storeName || !productName || !color || !seriesId) return;
-    add.mutate(
-      { storeName, productName, color, seriesId, seriesCount, enabled: true },
-      {
-        onSuccess: () => {
-          setProductName('');
-          setColor('');
-          setSeriesCount(1);
-        },
-      },
-    );
-  }
-
-  function getSeriesName(id: string) {
-    return series.find((s) => s.id === id)?.name ?? '—';
-  }
-
-  const filtered = useMemo(() => {
-    if (!filter.trim()) return allocations;
-    const q = filter.toLowerCase();
-    return allocations.filter(
-      (a) =>
-        a.storeName.toLowerCase().includes(q) ||
-        a.productName.toLowerCase().includes(q) ||
-        a.color.toLowerCase().includes(q),
-    );
-  }, [allocations, filter]);
-
-  const grouped = useMemo(() => {
-    const map = new Map<string, StoreAllocation[]>();
-    for (const a of filtered) {
-      const list = map.get(a.storeName) ?? [];
-      list.push(a);
-      map.set(a.storeName, list);
-    }
-    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-  }, [filtered]);
-
-  const noData = storeNames.length === 0 || productNames.length === 0;
+  const activeCount = rows.filter((r) => r.allocation?.enabled).length;
 
   return (
     <div className="rf-page">
@@ -129,110 +107,143 @@ export function AllocationPage() {
         <div>
           <p className="rf-page-eyebrow">Tahsisat Sistemi</p>
           <h1 className="rf-page-title">Mağaza Tahsisatları</h1>
-          <p className="rf-page-subtitle">Her mağaza × ürün × renk için hedef stok miktarı.</p>
+          <p className="rf-page-subtitle">
+            {storeFilter
+              ? `${rows.length} kombinasyon · ${activeCount} aktif`
+              : 'Mağaza seçerek başla.'}
+          </p>
         </div>
       </div>
 
-      <div className="rf-page-analysis-grid">
-        <Panel title="Yeni Tahsisat" subtitle={noData ? 'Önce veri yükle.' : 'Mağaza, ürün, renk ve seri seç.'}>
-          {noData ? (
-            <p style={{ fontSize: '0.84rem', color: 'var(--ink-muted)' }}>
-              Mağaza ve ürün listesi için önce bir Excel/CSV dosyası yükle.
-            </p>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <label className="rf-field">
-                <span>Mağaza</span>
-                <select className="rf-select" value={storeName} onChange={(e) => setStoreName(e.target.value)}>
-                  <option value="">Mağaza seç...</option>
-                  {storeNames.map((s) => <option key={s} value={s}>{s}</option>)}
-                </select>
-              </label>
+      {/* Filters */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+        <select
+          className="rf-select"
+          style={{ flex: '0 0 220px' }}
+          value={storeFilter}
+          onChange={(e) => setStoreFilter(e.target.value)}
+        >
+          <option value="">Mağaza seç...</option>
+          {storeNames.map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
 
-              <label className="rf-field">
-                <span>Ürün</span>
-                <select className="rf-select" value={productName} onChange={(e) => handleProductChange(e.target.value)}>
-                  <option value="">Ürün seç...</option>
-                  {productNames.map((p) => <option key={p} value={p}>{p}</option>)}
-                </select>
-              </label>
+        <input
+          type="text"
+          className="rf-text-input"
+          style={{ flex: '1 1 200px' }}
+          placeholder="Ürün veya renk ara..."
+          value={productFilter}
+          onChange={(e) => setProductFilter(e.target.value)}
+        />
 
-              <label className="rf-field">
-                <span>Renk</span>
-                <select className="rf-select" value={color} onChange={(e) => setColor(e.target.value)} disabled={!productName}>
-                  <option value="">Renk seç...</option>
-                  {colorsForProduct.map((c) => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </label>
-
-              <label className="rf-field">
-                <span>Seri</span>
-                <select className="rf-select" value={seriesId} onChange={(e) => setSeriesId(e.target.value)}>
-                  <option value="">Seri seç...</option>
-                  {series.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </select>
-              </label>
-
-              <label className="rf-field">
-                <span>Seri Adedi</span>
-                <input
-                  type="number"
-                  min={1}
-                  step={1}
-                  className="rf-text-input"
-                  value={seriesCount}
-                  onChange={(e) => setSeriesCount(Math.max(1, Number(e.target.value)))}
-                />
-              </label>
-
-              <button
-                type="button"
-                className="rf-primary-button"
-                disabled={!storeName || !productName || !color || !seriesId || add.isPending}
-                onClick={handleAdd}
-              >
-                <Plus size={15} style={{ marginRight: 6 }} />Ekle
-              </button>
-            </div>
-          )}
-        </Panel>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <input
-              type="text"
-              className="rf-text-input"
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              placeholder="Mağaza, ürün veya renk filtrele..."
-              style={{ flex: 1 }}
-            />
-            <span style={{ fontSize: '0.8rem', color: 'var(--ink-soft)', whiteSpace: 'nowrap' }}>
-              {allocations.length} kayıt
-            </span>
-          </div>
-
-          {isLoading && <p style={{ color: 'var(--ink-soft)', fontSize: '0.85rem' }}>Yükleniyor...</p>}
-          {!isLoading && allocations.length === 0 && (
-            <p style={{ color: 'var(--ink-muted)', fontSize: '0.85rem' }}>Henüz tahsisat tanımlanmamış.</p>
-          )}
-
-          {grouped.map(([store, items]) => (
-            <Panel key={store} title={store} subtitle={`${items.length} kayıt`}>
-              {items.map((a) => (
-                <AllocationRow
-                  key={a.id}
-                  alloc={a}
-                  seriesName={getSeriesName(a.seriesId)}
-                  onToggle={() => update.mutate({ id: a.id, data: { enabled: !a.enabled } })}
-                  onDelete={() => remove.mutate(a.id)}
-                  onSeriesCountChange={(count) => update.mutate({ id: a.id, data: { seriesCount: count } })}
-                />
-              ))}
-            </Panel>
-          ))}
-        </div>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.83rem', color: 'var(--ink-soft)', whiteSpace: 'nowrap', cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={onlyActive}
+            onChange={(e) => setOnlyActive(e.target.checked)}
+          />
+          Sadece aktif
+        </label>
       </div>
+
+      {!storeFilter && (
+        <p style={{ color: 'var(--ink-muted)', fontSize: '0.85rem' }}>Tablo görüntülemek için yukarıdan mağaza seç.</p>
+      )}
+
+      {storeFilter && (
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.84rem' }}>
+            <thead>
+              <tr style={{ borderBottom: '2px solid var(--line-strong)', textAlign: 'left' }}>
+                <th style={thStyle}>Ürün</th>
+                <th style={thStyle}>Renk</th>
+                <th style={{ ...thStyle, width: 160 }}>Seri</th>
+                <th style={{ ...thStyle, width: 80, textAlign: 'center' }}>Adet</th>
+                <th style={{ ...thStyle, width: 70, textAlign: 'center' }}>Aktif</th>
+              </tr>
+            </thead>
+            <tbody>
+              {allocLoading && (
+                <tr><td colSpan={5} style={{ padding: '16px', color: 'var(--ink-muted)' }}>Yükleniyor...</td></tr>
+              )}
+              {!allocLoading && rows.length === 0 && (
+                <tr><td colSpan={5} style={{ padding: '16px', color: 'var(--ink-muted)' }}>Sonuç yok.</td></tr>
+              )}
+              {rows.map((row) => {
+                const state = getAllocationState(row);
+                const rowKey = `${row.storeName}|||${row.productName}|||${row.color}`;
+                return (
+                  <tr
+                    key={rowKey}
+                    style={{
+                      borderBottom: '1px solid var(--line-strong)',
+                      background: state.enabled ? 'transparent' : 'var(--surface)',
+                      opacity: state.enabled ? 1 : 0.6,
+                    }}
+                  >
+                    <td style={tdStyle}>{row.productName}</td>
+                    <td style={{ ...tdStyle, color: 'var(--ink-soft)' }}>{row.color}</td>
+
+                    {/* Series selector */}
+                    <td style={tdStyle}>
+                      <select
+                        className="rf-select"
+                        style={{ fontSize: '0.8rem', minHeight: 32, padding: '0 8px' }}
+                        value={state.seriesId}
+                        onChange={(e) => saveRow(row, { ...state, seriesId: e.target.value })}
+                      >
+                        <option value="">—</option>
+                        {series.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                      </select>
+                    </td>
+
+                    {/* Series count */}
+                    <td style={{ ...tdStyle, textAlign: 'center' }}>
+                      <input
+                        type="number"
+                        min={1}
+                        step={1}
+                        defaultValue={state.seriesCount}
+                        key={`${rowKey}-${state.seriesCount}`}
+                        onChange={(e) => debouncedSave(row, { ...state, seriesCount: Math.max(1, Number(e.target.value)) })}
+                        style={{ width: 56, textAlign: 'center', padding: '3px 4px', borderRadius: 5, border: '1px solid var(--line-strong)', background: 'var(--surface)', color: 'var(--ink)', fontSize: '0.83rem' }}
+                      />
+                    </td>
+
+                    {/* Toggle */}
+                    <td style={{ ...tdStyle, textAlign: 'center' }}>
+                      <button
+                        type="button"
+                        onClick={() => saveRow(row, { ...state, enabled: !state.enabled })}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: state.enabled ? 'var(--accent)' : 'var(--ink-muted)', display: 'inline-flex' }}
+                        title={state.enabled ? 'Devre dışı bırak' : 'Etkinleştir'}
+                      >
+                        {state.enabled ? <ToggleRight size={22} /> : <ToggleLeft size={22} />}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
+
+const thStyle: React.CSSProperties = {
+  padding: '8px 12px',
+  fontWeight: 600,
+  color: 'var(--ink-soft)',
+  fontSize: '0.76rem',
+  textTransform: 'uppercase',
+  letterSpacing: '0.04em',
+  whiteSpace: 'nowrap',
+};
+
+const tdStyle: React.CSSProperties = {
+  padding: '7px 12px',
+  color: 'var(--ink)',
+  verticalAlign: 'middle',
+};
