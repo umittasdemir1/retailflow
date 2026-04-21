@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Panel } from '../ui/Panel';
 import { useSeries, useAssortmentRules, useAssortmentMutations, type AssortmentRule } from '../../hooks/useAllocation';
+import { useProducts } from '../../hooks/useStores';
 import { Plus, Trash2, Package, Tag } from 'lucide-react';
 
 function RuleRow({ rule, seriesName, onDelete }: { rule: AssortmentRule; seriesName: string; onDelete: () => void }) {
@@ -25,11 +26,26 @@ function RuleRow({ rule, seriesName, onDelete }: { rule: AssortmentRule; seriesN
 export function AssortmentPage() {
   const { data: rules = [], isLoading: rulesLoading } = useAssortmentRules();
   const { data: series = [] } = useSeries();
+  const { data: productsData } = useProducts();
   const { add, remove } = useAssortmentMutations();
 
   const [type, setType] = useState<'product' | 'category'>('product');
   const [targetName, setTargetName] = useState('');
   const [seriesId, setSeriesId] = useState('');
+
+  const products = productsData?.products ?? [];
+
+  const productNames = useMemo(
+    () => [...new Set(products.map((p) => p.productName))].sort(),
+    [products],
+  );
+
+  const categories = useMemo(
+    () => [...new Set(products.map((p) => p.category).filter((c): c is string => c !== null))].sort(),
+    [products],
+  );
+
+  const options = type === 'product' ? productNames : categories;
 
   function handleAdd() {
     if (!targetName.trim() || !seriesId) return;
@@ -63,28 +79,39 @@ export function AssortmentPage() {
               <button
                 type="button"
                 className={`rf-mode-button${type === 'product' ? ' is-active' : ''}`}
-                onClick={() => setType('product')}
+                onClick={() => { setType('product'); setTargetName(''); }}
               >
                 <Package size={14} style={{ marginRight: 6 }} />Ürün
               </button>
               <button
                 type="button"
                 className={`rf-mode-button${type === 'category' ? ' is-active' : ''}`}
-                onClick={() => setType('category')}
+                onClick={() => { setType('category'); setTargetName(''); }}
               >
                 <Tag size={14} style={{ marginRight: 6 }} />Kategori
               </button>
             </div>
 
             <label className="rf-field">
-              <span>{type === 'product' ? 'Ürün Adı' : 'Kategori Adı'}</span>
-              <input
-                type="text"
-                className="rf-text-input"
-                value={targetName}
-                onChange={(e) => setTargetName(e.target.value)}
-                placeholder={type === 'product' ? 'Örn: NOLAN JACKET' : 'Örn: KABAN'}
-              />
+              <span>{type === 'product' ? 'Ürün' : 'Kategori'}</span>
+              {options.length > 0 ? (
+                <select
+                  className="rf-select"
+                  value={targetName}
+                  onChange={(e) => setTargetName(e.target.value)}
+                >
+                  <option value="">{type === 'product' ? 'Ürün seç...' : 'Kategori seç...'}</option>
+                  {options.map((o) => <option key={o} value={o}>{o}</option>)}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  className="rf-text-input"
+                  value={targetName}
+                  onChange={(e) => setTargetName(e.target.value)}
+                  placeholder={type === 'product' ? 'Örn: NOLAN JACKET' : 'Örn: KABAN'}
+                />
+              )}
             </label>
 
             <label className="rf-field">
