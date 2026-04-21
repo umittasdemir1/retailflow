@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Panel } from '../ui/Panel';
 import { useSeries, useSeriesMutations, type Series } from '../../hooks/useAllocation';
+import { useProducts } from '../../hooks/useStores';
 import { Plus, Trash2, Pencil, Check, X } from 'lucide-react';
 
 interface SizeRow { size: string; ratio: number; }
@@ -80,11 +81,13 @@ function SizesEditor({ value, onChange }: { value: Record<string, number>; onCha
   );
 }
 
-function SeriesForm({ onSave, onCancel, initial }: {
+function SeriesForm({ onSave, onCancel, initial, categories }: {
   onSave: (name: string, sizes: Record<string, number>) => void;
   onCancel: () => void;
   initial?: Series;
+  categories: string[];
 }) {
+  const [nameMode, setNameMode] = useState<'custom' | 'category'>('custom');
   const [name, setName] = useState(initial?.name ?? '');
   const [sizes, setSizes] = useState<Record<string, number>>(initial?.sizes ?? {});
 
@@ -95,16 +98,31 @@ function SeriesForm({ onSave, onCancel, initial }: {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <label className="rf-field">
+      <div className="rf-field">
         <span>Seri Adı</span>
-        <input
-          type="text"
-          className="rf-text-input"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Örn: Standart, Küçük Beden, Büyük Beden"
-        />
-      </label>
+        <div className="rf-mode-row" style={{ marginBottom: 6 }}>
+          <button type="button" className={`rf-mode-button${nameMode === 'custom' ? ' is-active' : ''}`} onClick={() => { setNameMode('custom'); setName(''); }}>
+            Özel
+          </button>
+          <button type="button" className={`rf-mode-button${nameMode === 'category' ? ' is-active' : ''}`} onClick={() => { setNameMode('category'); setName(''); }} disabled={categories.length === 0}>
+            Kategoriden
+          </button>
+        </div>
+        {nameMode === 'custom' ? (
+          <input
+            type="text"
+            className="rf-text-input"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Örn: Standart, Küçük Beden…"
+          />
+        ) : (
+          <select className="rf-select" value={name} onChange={(e) => setName(e.target.value)}>
+            <option value="">Kategori seç...</option>
+            {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+        )}
+      </div>
       <div>
         <p style={{ fontSize: '0.78rem', color: 'var(--ink-soft)', marginBottom: 8 }}>Beden Oranları (0 = bu beden dahil değil)</p>
         <SizesEditor value={sizes} onChange={setSizes} />
@@ -141,8 +159,14 @@ function SeriesRow({ series, onDelete, onEdit }: { series: Series; onDelete: () 
 export function SeriesPage() {
   const { data: series = [], isLoading } = useSeries();
   const { add, update, remove } = useSeriesMutations();
+  const { data: productsData } = useProducts();
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  const categories = useMemo(
+    () => [...new Set((productsData?.products ?? []).map((p) => p.category).filter((c): c is string => c !== null))].sort(),
+    [productsData],
+  );
 
   function handleAdd(name: string, sizes: Record<string, number>) {
     add.mutate({ name, sizes }, { onSuccess: () => setShowForm(false) });
@@ -171,7 +195,7 @@ export function SeriesPage() {
       <div className="rf-page-single">
         {showForm && (
           <Panel title="Yeni Seri" subtitle="Beden oranlarını gir.">
-            <SeriesForm onSave={handleAdd} onCancel={() => setShowForm(false)} />
+            <SeriesForm onSave={handleAdd} onCancel={() => setShowForm(false)} categories={categories} />
           </Panel>
         )}
 
@@ -183,7 +207,7 @@ export function SeriesPage() {
           {series.map((s) =>
             editingId === s.id ? (
               <div key={s.id} style={{ padding: '12px 0', borderBottom: '1px solid var(--line-strong)' }}>
-                <SeriesForm initial={s} onSave={handleUpdate} onCancel={() => setEditingId(null)} />
+                <SeriesForm initial={s} onSave={handleUpdate} onCancel={() => setEditingId(null)} categories={categories} />
               </div>
             ) : (
               <SeriesRow
