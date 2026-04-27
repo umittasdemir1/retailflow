@@ -69,11 +69,20 @@ export function runAllocationAnalysis(
   interface ReceiverNeed {
     allocation: StoreAllocation;
     series: Series;
+    color: string;
     size: string;
     targetQty: number;
     currentQty: number;
     deficitQty: number;
-    str: number; // receiver STR for sorting
+    str: number;
+  }
+
+  // Build unique colors per (store, product) from inventory
+  const storeProductColors = new Map<string, Set<string>>();
+  for (const r of records) {
+    const k = `${r.warehouseName}|||${r.productName}`;
+    if (!storeProductColors.has(k)) storeProductColors.set(k, new Set());
+    storeProductColors.get(k)!.add(r.color);
   }
 
   const receiverNeeds: ReceiverNeed[] = [];
@@ -84,24 +93,31 @@ export function runAllocationAnalysis(
     const s = allSeries.find((x) => x.id === alloc.seriesId);
     if (!s) continue;
 
-    for (const [size, ratio] of Object.entries(s.sizes)) {
-      const targetQty = ratio * alloc.seriesCount;
-      const key = makeKey(alloc.storeName, alloc.productName, alloc.color, size);
-      const inv = invMap.get(key);
-      const currentQty = inv?.inventory ?? 0;
-      const deficitQty = Math.max(0, targetQty - currentQty);
+    // Iterate all colors of this product at this store
+    const colors = storeProductColors.get(`${alloc.storeName}|||${alloc.productName}`);
+    if (!colors) continue;
 
-      if (deficitQty <= 0) continue;
+    for (const color of colors) {
+      for (const [size, ratio] of Object.entries(s.sizes)) {
+        const targetQty = ratio * alloc.seriesCount;
+        const key = makeKey(alloc.storeName, alloc.productName, color, size);
+        const inv = invMap.get(key);
+        const currentQty = inv?.inventory ?? 0;
+        const deficitQty = Math.max(0, targetQty - currentQty);
 
-      receiverNeeds.push({
-        allocation: alloc,
-        series: s,
-        size,
-        targetQty,
-        currentQty,
-        deficitQty,
-        str: inv?.str ?? 0,
-      });
+        if (deficitQty <= 0) continue;
+
+        receiverNeeds.push({
+          allocation: alloc,
+          series: s,
+          color,
+          size,
+          targetQty,
+          currentQty,
+          deficitQty,
+          str: inv?.str ?? 0,
+        });
+      }
     }
   }
 
@@ -109,6 +125,7 @@ export function runAllocationAnalysis(
   receiverNeeds.sort((a, b) => b.str - a.str || b.deficitQty - a.deficitQty);
 
   for (const need of receiverNeeds) {
+    const color = need.color;
     let remaining = need.deficitQty;
 
     // Find all potential sources: same product+color+size, different store, has inventory
@@ -116,7 +133,7 @@ export function runAllocationAnalysis(
 
     for (const store of allStores) {
       if (store === need.allocation.storeName) continue;
-      const key = makeKey(store, need.allocation.productName, need.allocation.color, need.size);
+      const key = makeKey(store, need.allocation.productName, color, need.size);
       const inv = invMap.get(key);
       const rem = remainingInventory.get(key) ?? 0;
       if (!inv || rem <= 0) continue;
@@ -137,17 +154,17 @@ export function runAllocationAnalysis(
       remainingInventory.set(src.key, (remainingInventory.get(src.key) ?? 0) - canSend);
 
       const srcInv = invMap.get(src.key)!;
-      const rcvKey = makeKey(need.allocation.storeName, need.allocation.productName, need.allocation.color, need.size);
+      const rcvKey = makeKey(need.allocation.storeName, need.allocation.productName, color, need.size);
       const rcvInv = invMap.get(rcvKey);
 
       const senderTotal = srcInv.salesQty + srcInv.inventory;
       const receiverTotal = (rcvInv?.salesQty ?? 0) + (rcvInv?.inventory ?? 0);
 
       transfers.push({
-        productKey: `${need.allocation.productName}|||${need.allocation.color}|||${need.size}`,
+        productKey: `${need.allocation.productName}|||${color}|||${need.size}`,
         productCode: srcInv.productCode,
         productName: need.allocation.productName,
-        color: need.allocation.color,
+        color,
         size: need.size,
         senderStore: src.store,
         receiverStore: need.allocation.storeName,

@@ -22,7 +22,6 @@ export interface StoreAllocation {
   id: string;
   storeName: string;
   productName: string;
-  color: string;
   seriesId: string;
   seriesCount: number;
   enabled: boolean;

@@ -140,9 +140,7 @@ export const allocationStore = {
     const result: StoreAllocation[] = [];
     for (const item of items) {
       const existing = allocations.find(
-        (a) => a.storeName === item.storeName &&
-               a.productName === item.productName &&
-               a.color === item.color
+        (a) => a.storeName === item.storeName && a.productName === item.productName
       );
       if (existing) {
         Object.assign(existing, item);

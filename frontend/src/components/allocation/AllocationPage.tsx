@@ -1,12 +1,13 @@
 import { useState, useMemo, useRef } from 'react';
 import { useSeries, useAllocations, useAllocationMutations, useApplyRules, type StoreAllocation } from '../../hooks/useAllocation';
 import { useStores, useProducts } from '../../hooks/useStores';
-import { ChevronRight, ChevronDown, ToggleLeft, ToggleRight, ChevronsRight, Store, Wand2 } from 'lucide-react';
+import { ToggleLeft, ToggleRight, Store, Wand2 } from 'lucide-react';
 
 interface RowData {
   storeName: string;
   productName: string;
-  color: string;
+  colors: string[];
+  category: string | null;
   allocation: StoreAllocation | null;
 }
 
@@ -18,7 +19,7 @@ function getState(row: RowData) {
   };
 }
 
-function ColorRow({ row, series, onSave }: {
+function ProductRow({ row, series, onSave }: {
   row: RowData;
   series: { id: string; name: string }[];
   onSave: (row: RowData, patch: Partial<Omit<StoreAllocation, 'id' | 'createdAt'>>) => void;
@@ -31,15 +32,21 @@ function ColorRow({ row, series, onSave }: {
   }
 
   return (
-    <div className={`alc-color-row${state.seriesId ? ' has-series' : ''}`}>
-      <span className="alc-color-name">{row.color}</span>
+    <div className={`alc-product-row${state.seriesId ? ' has-series' : ''}`}>
+      <div className="alc-product-info">
+        <span className="alc-product-name">{row.productName}</span>
+        {row.category && <span className="alc-product-cat">{row.category}</span>}
+        <div className="alc-color-chips">
+          {row.colors.map((c) => <span key={c} className="alc-color-chip">{c}</span>)}
+        </div>
+      </div>
 
       <select
         className="alc-inline-select"
         value={state.seriesId}
         onChange={(e) => save({ seriesId: e.target.value })}
       >
-        <option value="">—</option>
+        <option value="">— Seri seç —</option>
         {series.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
       </select>
 
@@ -48,7 +55,7 @@ function ColorRow({ row, series, onSave }: {
         min={1}
         step={1}
         defaultValue={state.seriesCount}
-        key={row.allocation?.id ?? `${row.productName}${row.color}`}
+        key={row.allocation?.id ?? row.productName}
         onChange={(e) => {
           clearTimeout(timerRef.current);
           timerRef.current = setTimeout(() => save({ seriesCount: Math.max(1, Number(e.target.value)) }), 600);
@@ -56,95 +63,16 @@ function ColorRow({ row, series, onSave }: {
         className="alc-num-input"
       />
 
-      <button
-        type="button"
-        className={`alc-toggle${state.enabled ? ' is-on' : ''}`}
-        onClick={() => save({ enabled: !state.enabled })}
-        title={state.enabled ? 'Devre dışı bırak' : 'Etkinleştir'}
-      >
-        {state.enabled ? <ToggleRight size={22} /> : <ToggleLeft size={22} />}
-      </button>
-    </div>
-  );
-}
-
-function ProductGroup({ productName, colorRows, series, expanded, onToggle, onSave }: {
-  productName: string;
-  colorRows: RowData[];
-  series: { id: string; name: string }[];
-  expanded: boolean;
-  onToggle: () => void;
-  onSave: (row: RowData, patch: Partial<Omit<StoreAllocation, 'id' | 'createdAt'>>) => void;
-}) {
-  const [bulkSid, setBulkSid] = useState('');
-  const [bulkCnt, setBulkCnt] = useState(1);
-  const activeCount = colorRows.filter((r) => getState(r).enabled).length;
-
-  function applyBulk() {
-    if (!bulkSid) return;
-    colorRows.forEach((r) => onSave(r, { ...getState(r), seriesId: bulkSid, seriesCount: bulkCnt }));
-    setBulkSid('');
-    setBulkCnt(1);
-  }
-
-  return (
-    <div className="alc-group">
-      {/* Product header */}
-      <div className="alc-group-header">
-        <button type="button" className="alc-group-toggle" onClick={onToggle}>
-          {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
-          <span className="alc-group-name">{productName}</span>
-          <span className="alc-group-meta">{colorRows.length} renk · {activeCount} aktif</span>
+      <div className="alc-col-center">
+        <button
+          type="button"
+          className={`alc-toggle${state.enabled ? ' is-on' : ''}`}
+          onClick={() => save({ enabled: !state.enabled })}
+          title={state.enabled ? 'Devre dışı bırak' : 'Etkinleştir'}
+        >
+          {state.enabled ? <ToggleRight size={22} /> : <ToggleLeft size={22} />}
         </button>
-
-        <div className="alc-bulk-area" onClick={(e) => e.stopPropagation()}>
-          <select
-            className="alc-inline-select"
-            value={bulkSid}
-            onChange={(e) => setBulkSid(e.target.value)}
-          >
-            <option value="">Tümüne seri uygula…</option>
-            {series.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
-          <input
-            type="number"
-            min={1}
-            step={1}
-            value={bulkCnt}
-            onChange={(e) => setBulkCnt(Math.max(1, Number(e.target.value)))}
-            className="alc-num-input"
-          />
-          <button
-            type="button"
-            className="rf-icon-btn"
-            disabled={!bulkSid}
-            onClick={applyBulk}
-            title="Tümüne uygula"
-          >
-            <ChevronsRight size={14} />
-          </button>
-        </div>
       </div>
-
-      {/* Color rows */}
-      {expanded && (
-        <div className="alc-color-list">
-          <div className="alc-color-list-header">
-            <span>Renk</span>
-            <span>Seri</span>
-            <span className="alc-col-center">Adet</span>
-            <span className="alc-col-center">Aktif</span>
-          </div>
-          {colorRows.map((row) => (
-            <ColorRow
-              key={row.color}
-              row={row}
-              series={series}
-              onSave={onSave}
-            />
-          ))}
-        </div>
-      )}
     </div>
   );
 }
@@ -160,51 +88,41 @@ export function AllocationPage() {
   const [storeFilter, setStoreFilter] = useState('');
   const [productFilter, setProductFilter] = useState('');
   const [onlyActive, setOnlyActive] = useState(false);
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const storeNames = useMemo(() => stores.map((s) => s.name).sort(), [stores]);
   const products   = productsData?.products ?? [];
 
   const allocMap = useMemo(() => {
     const map = new Map<string, StoreAllocation>();
-    for (const a of allocations) map.set(`${a.storeName}|||${a.productName}|||${a.color}`, a);
+    for (const a of allocations) map.set(`${a.storeName}|||${a.productName}`, a);
     return map;
   }, [allocations]);
 
-  const grouped = useMemo(() => {
+  const rows = useMemo<RowData[]>(() => {
     if (!storeFilter) return [];
     const pq = productFilter.toLowerCase();
-    const map = new Map<string, RowData[]>();
-    for (const p of products) {
-      if (pq && !p.productName.toLowerCase().includes(pq)) continue;
-      const colorRows: RowData[] = p.colors.map((c) => ({
-        storeName: storeFilter, productName: p.productName, color: c,
-        allocation: allocMap.get(`${storeFilter}|||${p.productName}|||${c}`) ?? null,
-      }));
-      if (onlyActive && !colorRows.some((r) => getState(r).enabled)) continue;
-      map.set(p.productName, colorRows);
-    }
-    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+    return products
+      .filter((p) => !pq || p.productName.toLowerCase().includes(pq))
+      .map((p) => ({
+        storeName:   storeFilter,
+        productName: p.productName,
+        colors:      p.colors,
+        category:    p.category,
+        allocation:  allocMap.get(`${storeFilter}|||${p.productName}`) ?? null,
+      }))
+      .filter((r) => !onlyActive || getState(r).enabled)
+      .sort((a, b) => a.productName.localeCompare(b.productName));
   }, [storeFilter, productFilter, onlyActive, products, allocMap]);
-
-  function toggleGroup(name: string) {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      next.has(name) ? next.delete(name) : next.add(name);
-      return next;
-    });
-  }
 
   function saveRow(row: RowData, patch: Partial<Omit<StoreAllocation, 'id' | 'createdAt'>>) {
     if (row.allocation) {
       update.mutate({ id: row.allocation.id, data: patch });
     } else {
-      add.mutate({ storeName: row.storeName, productName: row.productName, color: row.color, seriesId: '', seriesCount: 1, enabled: true, ...patch });
+      add.mutate({ storeName: row.storeName, productName: row.productName, seriesId: '', seriesCount: 1, enabled: true, ...patch });
     }
   }
 
-  const totalActive = grouped.reduce((n, [, rows]) => n + rows.filter((r) => getState(r).enabled).length, 0);
-  const totalRows   = grouped.reduce((n, [, rows]) => n + rows.length, 0);
+  const totalWithSeries = rows.filter((r) => getState(r).seriesId).length;
 
   return (
     <div className="rf-page">
@@ -214,7 +132,7 @@ export function AllocationPage() {
           <h1 className="rf-page-title">Mağaza Tahsisatları</h1>
           <p className="rf-page-subtitle">
             {storeFilter
-              ? `${grouped.length} model · ${totalRows} renk · ${totalActive} aktif`
+              ? `${rows.length} model · ${totalWithSeries} serili`
               : 'Mağaza seçerek başla.'}
           </p>
         </div>
@@ -258,18 +176,21 @@ export function AllocationPage() {
         </div>
       ) : allocLoading ? (
         <p className="alc-loading">Yükleniyor…</p>
-      ) : grouped.length === 0 ? (
+      ) : rows.length === 0 ? (
         <div className="prd-empty" style={{ marginTop: 48 }}><p>Sonuç yok.</p></div>
       ) : (
-        <div className="alc-group-list">
-          {grouped.map(([productName, colorRows]) => (
-            <ProductGroup
-              key={productName}
-              productName={productName}
-              colorRows={colorRows}
+        <div className="alc-list">
+          <div className="alc-list-header">
+            <span>Model / Renkler</span>
+            <span>Seri</span>
+            <span className="alc-col-center">Adet</span>
+            <span className="alc-col-center">Aktif</span>
+          </div>
+          {rows.map((row) => (
+            <ProductRow
+              key={row.productName}
+              row={row}
               series={series}
-              expanded={expanded.has(productName)}
-              onToggle={() => toggleGroup(productName)}
               onSave={saveRow}
             />
           ))}

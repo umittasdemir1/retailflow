@@ -79,9 +79,9 @@ allocationRouter.get('/allocations/store/:storeName', (req, res) => {
 });
 
 allocationRouter.post('/allocations', (req, res) => {
-  const { storeName, productName, color, seriesId, seriesCount, enabled } = req.body ?? {};
-  if (!storeName || !productName || !color || !seriesId || seriesCount == null) {
-    res.status(400).json({ ok: false, error: 'storeName, productName, color, seriesId, seriesCount gerekli' });
+  const { storeName, productName, seriesId, seriesCount, enabled } = req.body ?? {};
+  if (!storeName || !productName || !seriesId || seriesCount == null) {
+    res.status(400).json({ ok: false, error: 'storeName, productName, seriesId, seriesCount gerekli' });
     return;
   }
   if (!allocationStore.findSeriesById(seriesId)) {
@@ -91,7 +91,6 @@ allocationRouter.post('/allocations', (req, res) => {
   const item = allocationStore.addAllocation({
     storeName,
     productName,
-    color,
     seriesId,
     seriesCount: Number(seriesCount),
     enabled: enabled !== false,
@@ -130,19 +129,19 @@ allocationRouter.post('/apply-rules', (_req, res) => {
     return;
   }
 
-  // Build unique store × product × color set from inventory
-  const combos = new Map<string, { storeName: string; productName: string; color: string; category: string | null }>();
+  // Build unique store × product set from inventory
+  const combos = new Map<string, { storeName: string; productName: string; category: string | null }>();
   for (const r of state.data) {
-    const key = `${r.warehouseName}|||${r.productName}|||${r.color}`;
+    const key = `${r.warehouseName}|||${r.productName}`;
     if (!combos.has(key)) {
-      combos.set(key, { storeName: r.warehouseName, productName: r.productName, color: r.color, category: r.category ?? null });
+      combos.set(key, { storeName: r.warehouseName, productName: r.productName, category: r.category ?? null });
     }
   }
 
   // Existing allocations lookup (skip ones that already have a series set)
   const existingMap = new Map<string, import('@retailflow/shared').StoreAllocation>();
   for (const a of allocationStore.getAllAllocations()) {
-    existingMap.set(`${a.storeName}|||${a.productName}|||${a.color}`, a);
+    existingMap.set(`${a.storeName}|||${a.productName}`, a);
   }
 
   const toUpsert: import('@retailflow/shared').StoreAllocation[] = [];
@@ -150,7 +149,7 @@ allocationRouter.post('/apply-rules', (_req, res) => {
   let skipped = 0;
 
   for (const combo of combos.values()) {
-    const existing = existingMap.get(`${combo.storeName}|||${combo.productName}|||${combo.color}`);
+    const existing = existingMap.get(`${combo.storeName}|||${combo.productName}`);
 
     // Already has a series manually set → skip
     if (existing?.seriesId) { skipped++; continue; }
@@ -162,7 +161,6 @@ allocationRouter.post('/apply-rules', (_req, res) => {
       id:          existing?.id ?? '',
       storeName:   combo.storeName,
       productName: combo.productName,
-      color:       combo.color,
       seriesId:    resolved.id,
       seriesCount: existing?.seriesCount ?? 1,
       enabled:     existing?.enabled     ?? true,

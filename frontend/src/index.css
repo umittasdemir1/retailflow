@@ -2718,83 +2718,59 @@ button { cursor: pointer; }
 }
 .alc-loading { padding: 24px 0; text-align: center; color: var(--ink-muted); font-size: 0.88rem; }
 
-/* ── Accordion group list ────────────────────────────────────────── */
-.alc-group-list {
-  display: flex; flex-direction: column; gap: 6px;
-}
-
-.alc-group {
+/* ── Allocation product list ─────────────────────────────────────── */
+.alc-list {
   border: 1px solid var(--line);
   border-radius: 10px;
   overflow: hidden;
   background: var(--bg);
 }
 
-.alc-group-header {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 12px;
-  padding: 0 10px 0 0;
-  background: var(--surface);
-  min-height: 44px;
-}
-.alc-group-header:hover { background: var(--surface-up); }
-
-.alc-group-toggle {
-  display: flex; align-items: center; gap: 8px;
-  flex: 1; min-width: 0;
-  background: none; border: none; cursor: pointer;
-  padding: 10px 10px 10px 12px;
-  text-align: left; color: inherit;
-}
-.alc-group-name {
-  font-size: 0.875rem; font-weight: 600; color: var(--ink);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.alc-group-meta {
-  font-size: 0.75rem; color: var(--ink-muted); font-weight: 400;
-  flex-shrink: 0;
-}
-
-/* bulk area inside group header */
-.alc-bulk-area {
-  display: flex; align-items: center; gap: 6px; flex-shrink: 0;
-}
-
-/* ── Color rows ──────────────────────────────────────────────────── */
-.alc-color-list {
-  border-top: 1px solid var(--line);
-}
-
-.alc-color-list-header {
+.alc-list-header {
   display: grid;
-  grid-template-columns: 1fr 200px 80px 60px;
-  gap: 10px;
-  padding: 6px 14px 6px 36px;
+  grid-template-columns: 1fr 220px 80px 60px;
+  gap: 12px;
+  padding: 8px 16px;
   background: var(--surface);
   border-bottom: 1px solid var(--line);
   font-size: 0.71rem; font-weight: 600;
   color: var(--ink-muted); text-transform: uppercase; letter-spacing: 0.04em;
 }
-.alc-color-list-header .alc-col-center { text-align: center; }
 
-.alc-color-row {
+.alc-product-row {
   display: grid;
-  grid-template-columns: 1fr 200px 80px 60px;
-  gap: 10px;
+  grid-template-columns: 1fr 220px 80px 60px;
+  gap: 12px;
   align-items: center;
-  padding: 7px 14px 7px 36px;
+  padding: 10px 16px;
   border-bottom: 1px solid var(--line);
   transition: background 100ms ease;
+  border-left: 3px solid transparent;
 }
-.alc-color-row:last-child { border-bottom: none; }
-.alc-color-row:hover { background: var(--surface); }
+.alc-product-row:last-child { border-bottom: none; }
+.alc-product-row:hover { background: var(--surface); }
+.alc-product-row.has-series { border-left-color: var(--accent); }
 
-.alc-color-row.has-series { border-left: 3px solid var(--accent); padding-left: 33px; }
-
-.alc-color-name {
-  font-size: 0.84rem; color: var(--ink-soft); font-weight: 500;
+.alc-product-info {
+  display: flex; flex-direction: column; gap: 4px; min-width: 0;
+}
+.alc-product-name {
+  font-size: 0.875rem; font-weight: 600; color: var(--ink);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+.alc-product-cat {
+  font-size: 0.72rem; color: var(--ink-muted);
+}
+.alc-color-chips {
+  display: flex; flex-wrap: wrap; gap: 4px;
+}
+.alc-color-chip {
+  display: inline-block;
+  padding: 1px 6px; border-radius: 4px;
+  background: var(--surface-up); color: var(--ink-soft);
+  font-size: 0.7rem;
+}
+
 .alc-col-center { display: flex; justify-content: center; align-items: center; }
 
 /* ── Shared controls ─────────────────────────────────────────────── */
