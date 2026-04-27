@@ -49,6 +49,8 @@ const columnMap = {
   'Kategori': 'category',
   'Urun Kategorisi': 'category',
   'Ürün Kategorisi': 'category',
+  'Beden Araligi': 'sizeRange',
+  'Beden Aralığı': 'sizeRange',
 } as const;
 
 type ColumnTarget = (typeof columnMap)[keyof typeof columnMap];
@@ -131,6 +133,7 @@ function normalizeRow(row: Record<string, unknown>): InventoryRecord {
     itemUrl: null,
     price: null,
     category: null,
+    sizeRange: null,
   };
 
   for (const [sourceKey, targetKey] of Object.entries(columnMap) as Array<[string, ColumnTarget]>) {

@@ -1,6 +1,6 @@
-import { useRef, useState, useMemo } from 'react';
-import { useSizeTemplates, useUploadSizeTemplates, useSeriesMutations, useAssortmentMutations, useSeries, type SizeTemplate } from '../../hooks/useAllocation';
-import { Check, Loader2, Upload, FileSpreadsheet } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { useSizeTemplates, useSeriesMutations, useAssortmentMutations, useSeries, type SizeTemplate } from '../../hooks/useAllocation';
+import { Check, Loader2, FileSpreadsheet } from 'lucide-react';
 
 const PAGE_SIZE = 50;
 
@@ -59,9 +59,7 @@ export function SizeTemplatePage() {
   const { data: series = [] } = useSeries();
   const { add: addSeries } = useSeriesMutations();
   const { add: addRule } = useAssortmentMutations();
-  const uploadMutation = useUploadSizeTemplates();
 
-  const fileRef = useRef<HTMLInputElement>(null);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
   const [savingKey, setSavingKey] = useState<string | null>(null);
@@ -81,13 +79,6 @@ export function SizeTemplatePage() {
   const paged = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
   function handleSearch(v: string) { setSearch(v); setPage(0); }
-
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    uploadMutation.mutate(file);
-    e.target.value = '';
-  }
 
   async function handleSave(tpl: SizeTemplate, qtys: RowQtys) {
     const key = `${tpl.year}|||${tpl.productName}|||${tpl.color}`;
@@ -122,36 +113,22 @@ export function SizeTemplatePage() {
           <p className="rf-page-subtitle">
             {isLoading ? 'Yükleniyor…'
               : uploaded ? `${filtered.length} kayıt · ${pageCount} sayfa`
-              : 'Excel dosyasını yükle.'}
+              : 'Önce envanter verisi yükle.'}
           </p>
-        </div>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <input ref={fileRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={handleFileChange} />
-          <button
-            type="button"
-            className="rf-primary-button"
-            disabled={uploadMutation.isPending}
-            onClick={() => fileRef.current?.click()}
-          >
-            {uploadMutation.isPending
-              ? <Loader2 size={15} className="szt-spin" style={{ marginRight: 6 }} />
-              : <Upload size={15} style={{ marginRight: 6 }} />}
-            {uploaded ? 'Yeni Dosya Yükle' : 'Excel Yükle'}
-          </button>
         </div>
       </div>
 
-      {!uploaded && !isLoading && (
+      {isLoading ? (
+        <p className="alc-loading">Yükleniyor…</p>
+      ) : !uploaded ? (
         <div className="prd-empty" style={{ marginTop: 48 }}>
           <FileSpreadsheet size={40} strokeWidth={1.2} />
-          <p>Beden aralıklarını içeren Excel dosyasını yükleyin.</p>
+          <p>Beden aralıklarını görmek için önce envanter Excel'ini yükle.</p>
           <p style={{ fontSize: '0.8rem', color: 'var(--ink-muted)' }}>
-            Sütunlar: Yıl · Ürün Adı · Renk · … · Beden Aralığı (en sondaki Beden sütunu kullanılır)
+            Excel'de <strong>Beden Aralığı</strong> sütunu olmalı (örn: S, M, L, XL, 2XL)
           </p>
         </div>
-      )}
-
-      {uploaded && (
+      ) : (
         <>
           <div className="szt-toolbar">
             <input

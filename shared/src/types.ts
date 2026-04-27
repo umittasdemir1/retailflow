@@ -71,6 +71,7 @@ export interface InventoryRecord {
   itemUrl?: string | null;
   price?: number | null;
   category?: string | null;
+  sizeRange?: string | null;
 }
 
 export interface ProductVariantKey {

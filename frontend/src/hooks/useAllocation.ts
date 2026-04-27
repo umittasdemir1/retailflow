@@ -3,7 +3,7 @@ import {
   fetchSeries, createSeries, updateSeries, deleteSeries,
   fetchAssortmentRules, createAssortmentRule, deleteAssortmentRule,
   fetchAllocations, createAllocation, updateAllocation, deleteAllocation, bulkUpsertAllocations,
-  applyAssortmentRules, fetchSizeTemplates, uploadSizeTemplates,
+  applyAssortmentRules, fetchSizeTemplates,
 } from '../lib/api';
 import type { Series, AssortmentRule, StoreAllocation, SizeTemplate } from '../lib/api';
 
@@ -13,13 +13,6 @@ export function useSizeTemplates() {
   return useQuery({ queryKey: ['size-templates'], queryFn: fetchSizeTemplates, staleTime: Infinity });
 }
 
-export function useUploadSizeTemplates() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: uploadSizeTemplates,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['size-templates'] }),
-  });
-}
 
 export function useSeries() {
   return useQuery({ queryKey: ['series'], queryFn: fetchSeries });
