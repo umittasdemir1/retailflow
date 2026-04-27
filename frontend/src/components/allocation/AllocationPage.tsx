@@ -31,7 +31,7 @@ function ColorRow({ row, series, onSave }: {
   }
 
   return (
-    <div className="alc-color-row">
+    <div className={`alc-color-row${state.seriesId ? ' has-series' : ''}`}>
       <span className="alc-color-name">{row.color}</span>
 
       <select
