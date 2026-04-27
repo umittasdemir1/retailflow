@@ -363,9 +363,18 @@ export interface SizeTemplate {
   sizes: string[];
 }
 
-export async function fetchSizeTemplates(): Promise<SizeTemplate[]> {
-  const r = await api.get<{ ok: boolean; data: SizeTemplate[] }>('/size-templates');
-  return r.data.data;
+export async function fetchSizeTemplates(): Promise<{ data: SizeTemplate[]; uploaded: boolean }> {
+  const r = await api.get<{ ok: boolean; data: SizeTemplate[]; uploaded: boolean }>('/size-templates');
+  return { data: r.data.data, uploaded: r.data.uploaded };
+}
+
+export async function uploadSizeTemplates(file: File): Promise<{ count: number }> {
+  const formData = new FormData();
+  formData.append('file', file);
+  const r = await api.post<{ ok: boolean; count: number }>('/size-templates/upload', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return { count: r.data.count };
 }
 
 export async function applyAssortmentRules(): Promise<{ applied: number; skipped: number }> {

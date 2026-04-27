@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react';
-import { useSizeTemplates, useSeriesMutations, useAssortmentMutations, useSeries, type SizeTemplate } from '../../hooks/useAllocation';
-import { Check, Loader2 } from 'lucide-react';
+import { useRef, useState, useMemo } from 'react';
+import { useSizeTemplates, useUploadSizeTemplates, useSeriesMutations, useAssortmentMutations, useSeries, type SizeTemplate } from '../../hooks/useAllocation';
+import { Check, Loader2, Upload, FileSpreadsheet } from 'lucide-react';
 
 const PAGE_SIZE = 50;
 
@@ -20,7 +20,7 @@ function TemplateRow({ tpl, onSave, saving }: {
       <div className="szt-meta">
         {tpl.year && <span className="szt-year">{tpl.year}</span>}
         <span className="szt-product">{tpl.productName}</span>
-        <span className="szt-color">{tpl.color}</span>
+        {tpl.color && <span className="szt-color">{tpl.color}</span>}
       </div>
 
       <div className="szt-sizes">
@@ -28,9 +28,7 @@ function TemplateRow({ tpl, onSave, saving }: {
           <div key={size} className="szt-size-cell">
             <label className="szt-size-label">{size}</label>
             <input
-              type="number"
-              min={1}
-              step={1}
+              type="number" min={1} step={1}
               value={qtys[size]}
               onChange={(e) => setQtys((prev) => ({ ...prev, [size]: Math.max(1, Number(e.target.value)) }))}
               className="alc-num-input szt-size-input"
@@ -54,11 +52,16 @@ function TemplateRow({ tpl, onSave, saving }: {
 }
 
 export function SizeTemplatePage() {
-  const { data: templates = [], isLoading } = useSizeTemplates();
+  const { data: result, isLoading } = useSizeTemplates();
+  const templates: SizeTemplate[] = result?.data ?? [];
+  const uploaded: boolean = result?.uploaded ?? false;
+
   const { data: series = [] } = useSeries();
   const { add: addSeries } = useSeriesMutations();
   const { add: addRule } = useAssortmentMutations();
+  const uploadMutation = useUploadSizeTemplates();
 
+  const fileRef = useRef<HTMLInputElement>(null);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
   const [savingKey, setSavingKey] = useState<string | null>(null);
@@ -77,23 +80,21 @@ export function SizeTemplatePage() {
   const pageCount = Math.ceil(filtered.length / PAGE_SIZE);
   const paged = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
-  function handleSearch(v: string) {
-    setSearch(v);
-    setPage(0);
+  function handleSearch(v: string) { setSearch(v); setPage(0); }
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    uploadMutation.mutate(file);
+    e.target.value = '';
   }
 
   async function handleSave(tpl: SizeTemplate, qtys: RowQtys) {
     const key = `${tpl.year}|||${tpl.productName}|||${tpl.color}`;
     setSavingKey(key);
-
     const sizes = Object.fromEntries(tpl.sizes.map((s) => [s, qtys[s] ?? 1]));
-    const seriesName = tpl.year
-      ? `${tpl.productName} ${tpl.year}`
-      : tpl.productName;
-
-    // Check if series with this name already exists
+    const seriesName = tpl.year ? `${tpl.productName} ${tpl.year}` : tpl.productName;
     const existing = series.find((s) => s.name === seriesName);
-
     try {
       let seriesId: string;
       if (existing) {
@@ -101,10 +102,7 @@ export function SizeTemplatePage() {
       } else {
         await new Promise<void>((resolve, reject) => {
           addSeries.mutate({ name: seriesName, sizes }, {
-            onSuccess: (created) => {
-              seriesId = created.id;
-              resolve();
-            },
+            onSuccess: (created) => { seriesId = created.id; resolve(); },
             onError: reject,
           });
         });
@@ -122,48 +120,71 @@ export function SizeTemplatePage() {
           <p className="rf-page-eyebrow">Tahsisat Sistemi</p>
           <h1 className="rf-page-title">Beden Aralıkları</h1>
           <p className="rf-page-subtitle">
-            {isLoading ? 'Yükleniyor…' : `${filtered.length} kayıt · ${pageCount} sayfa`}
+            {isLoading ? 'Yükleniyor…'
+              : uploaded ? `${filtered.length} kayıt · ${pageCount} sayfa`
+              : 'Excel dosyasını yükle.'}
           </p>
+        </div>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <input ref={fileRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={handleFileChange} />
+          <button
+            type="button"
+            className="rf-primary-button"
+            disabled={uploadMutation.isPending}
+            onClick={() => fileRef.current?.click()}
+          >
+            {uploadMutation.isPending
+              ? <Loader2 size={15} className="szt-spin" style={{ marginRight: 6 }} />
+              : <Upload size={15} style={{ marginRight: 6 }} />}
+            {uploaded ? 'Yeni Dosya Yükle' : 'Excel Yükle'}
+          </button>
         </div>
       </div>
 
-      <div className="szt-toolbar">
-        <input
-          type="text"
-          className="rf-text-input"
-          placeholder="Model, renk veya yıl ara…"
-          value={search}
-          onChange={(e) => handleSearch(e.target.value)}
-          style={{ maxWidth: 360 }}
-        />
-      </div>
+      {!uploaded && !isLoading && (
+        <div className="prd-empty" style={{ marginTop: 48 }}>
+          <FileSpreadsheet size={40} strokeWidth={1.2} />
+          <p>Beden aralıklarını içeren Excel dosyasını yükleyin.</p>
+          <p style={{ fontSize: '0.8rem', color: 'var(--ink-muted)' }}>
+            Sütunlar: Yıl · Ürün Adı · Renk · … · Beden Aralığı (en sondaki Beden sütunu kullanılır)
+          </p>
+        </div>
+      )}
 
-      {isLoading ? (
-        <p className="alc-loading">Yükleniyor…</p>
-      ) : paged.length === 0 ? (
-        <div className="prd-empty" style={{ marginTop: 48 }}><p>Sonuç yok.</p></div>
-      ) : (
+      {uploaded && (
         <>
-          <div className="szt-list">
-            {paged.map((tpl) => {
-              const key = `${tpl.year}|||${tpl.productName}|||${tpl.color}`;
-              return (
-                <TemplateRow
-                  key={key}
-                  tpl={tpl}
-                  onSave={handleSave}
-                  saving={savingKey === key}
-                />
-              );
-            })}
+          <div className="szt-toolbar">
+            <input
+              type="text"
+              className="rf-text-input"
+              placeholder="Model, renk veya yıl ara…"
+              value={search}
+              onChange={(e) => handleSearch(e.target.value)}
+              style={{ maxWidth: 360 }}
+            />
           </div>
 
-          {pageCount > 1 && (
-            <div className="szt-pagination">
-              <button type="button" className="rf-secondary-button" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>← Önceki</button>
-              <span className="szt-page-info">{page + 1} / {pageCount}</span>
-              <button type="button" className="rf-secondary-button" disabled={page >= pageCount - 1} onClick={() => setPage((p) => p + 1)}>Sonraki →</button>
-            </div>
+          {paged.length === 0 ? (
+            <div className="prd-empty" style={{ marginTop: 48 }}><p>Sonuç yok.</p></div>
+          ) : (
+            <>
+              <div className="szt-list">
+                {paged.map((tpl) => {
+                  const key = `${tpl.year}|||${tpl.productName}|||${tpl.color}`;
+                  return (
+                    <TemplateRow key={key} tpl={tpl} onSave={handleSave} saving={savingKey === key} />
+                  );
+                })}
+              </div>
+
+              {pageCount > 1 && (
+                <div className="szt-pagination">
+                  <button type="button" className="rf-secondary-button" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>← Önceki</button>
+                  <span className="szt-page-info">{page + 1} / {pageCount}</span>
+                  <button type="button" className="rf-secondary-button" disabled={page >= pageCount - 1} onClick={() => setPage((p) => p + 1)}>Sonraki →</button>
+                </div>
+              )}
+            </>
           )}
         </>
       )}

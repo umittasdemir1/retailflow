@@ -18,7 +18,7 @@ import { visionRouter } from './routes/vision.js';
 import { calibrationRouter } from './routes/calibration.js';
 import { telegramTestRouter } from './routes/telegramTest.js';
 import { allocationRouter } from './routes/allocationRouter.js';
-import { sizeTemplatesRouter } from './routes/sizeTemplatesRouter.js';
+import { createSizeTemplatesRouter } from './routes/sizeTemplatesRouter.js';
 import { warmUpPythonVision, embedCatalogImages } from './services/pythonVision.js';
 import { startTelegramBot } from './services/telegramBot.js';
 import { catalogStore } from './store/catalogStore.js';
@@ -67,7 +67,8 @@ app.use('/api/vision', visionRouter(upload));
 app.use('/api/calibration', calibrationRouter(upload));
 app.use('/api/telegram-test', telegramTestRouter(upload));
 app.use('/api/allocation', allocationRouter);
-app.use('/api/size-templates', sizeTemplatesRouter);
+const memUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
+app.use('/api/size-templates', createSizeTemplatesRouter(memUpload));
 
 app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   const message = error instanceof Error ? error.message : 'Bilinmeyen hata';
