@@ -104,7 +104,7 @@ export function runAllocationAnalysis(
       const currentColorTotal = sizeEntries.reduce((sum, [size]) => {
         return sum + (invMap.get(makeKey(alloc.storeName, alloc.productName, color, size))?.inventory ?? 0);
       }, 0);
-      if (currentColorTotal < 2) continue;
+      if (currentColorTotal === 0) continue;
 
       for (const [size, ratio] of sizeEntries) {
         const targetQty = ratio * alloc.seriesCount;
@@ -137,7 +137,7 @@ export function runAllocationAnalysis(
     let remaining = need.deficitQty;
 
     // Find all potential sources: same product+color+size, different store, has inventory
-    const sources: Array<{ store: string; str: number; inventory: number; key: string }> = [];
+    const sources: Array<{ store: string; salesQty: number; inventory: number; key: string }> = [];
 
     for (const store of allStores) {
       if (store === need.allocation.storeName) continue;
@@ -146,11 +146,11 @@ export function runAllocationAnalysis(
       const rem = remainingInventory.get(key) ?? 0;
       if (!inv || rem <= 0) continue;
 
-      sources.push({ store, str: inv.str, inventory: rem, key });
+      sources.push({ store, salesQty: inv.salesQty, inventory: rem, key });
     }
 
-    // Sort sources: lowest STR first (not selling → give away first)
-    sources.sort((a, b) => a.str - b.str);
+    // Sort sources: lowest sales first, then highest inventory (least-selling overstock gives first)
+    sources.sort((a, b) => a.salesQty - b.salesQty || b.inventory - a.inventory);
 
     for (const src of sources) {
       if (remaining <= 0) break;
