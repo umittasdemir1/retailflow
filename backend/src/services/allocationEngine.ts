@@ -99,13 +99,15 @@ export function runAllocationAnalysis(
 
     for (const color of colors) {
       const sizeEntries = Object.entries(s.sizes);
-      const rawTotal = sizeEntries.reduce((sum, [, ratio]) => sum + ratio * alloc.seriesCount, 0);
 
-      // Ensure at least 2 units per (store, product, color) across all sizes
-      const scaleFactor = rawTotal > 0 && rawTotal < 2 ? 2 / rawTotal : 1;
+      // Skip colors that don't exist at this store at all — don't introduce new colors
+      const currentColorTotal = sizeEntries.reduce((sum, [size]) => {
+        return sum + (invMap.get(makeKey(alloc.storeName, alloc.productName, color, size))?.inventory ?? 0);
+      }, 0);
+      if (currentColorTotal === 0) continue;
 
       for (const [size, ratio] of sizeEntries) {
-        const targetQty = Math.ceil(ratio * alloc.seriesCount * scaleFactor);
+        const targetQty = ratio * alloc.seriesCount;
         const key = makeKey(alloc.storeName, alloc.productName, color, size);
         const inv = invMap.get(key);
         const currentQty = inv?.inventory ?? 0;
