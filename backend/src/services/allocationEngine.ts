@@ -104,7 +104,7 @@ export function runAllocationAnalysis(
       const currentColorTotal = sizeEntries.reduce((sum, [size]) => {
         return sum + (invMap.get(makeKey(alloc.storeName, alloc.productName, color, size))?.inventory ?? 0);
       }, 0);
-      if (currentColorTotal === 0) continue;
+      if (currentColorTotal < 2) continue;
 
       for (const [size, ratio] of sizeEntries) {
         const targetQty = ratio * alloc.seriesCount;
