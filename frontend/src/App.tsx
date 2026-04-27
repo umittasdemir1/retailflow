@@ -25,6 +25,7 @@ import { GuidePage } from './components/guide/GuidePage';
 import { SeriesPage } from './components/allocation/SeriesPage';
 import { AssortmentPage } from './components/allocation/AssortmentPage';
 import { AllocationPage } from './components/allocation/AllocationPage';
+import { SizeTemplatePage } from './components/allocation/SizeTemplatePage';
 import { SummaryPanel } from './components/results/SummaryPanel';
 import { SimulationPanel } from './components/results/SimulationPanel';
 import { TransferTable } from './components/results/TransferTable';
@@ -391,6 +392,9 @@ export default function App() {
 
         {/* ─── ALLOCATIONS ─── */}
         {activePage === 'allocations' && <AllocationPage />}
+
+        {/* ─── SIZE TEMPLATES ─── */}
+        {activePage === 'size-templates' && <SizeTemplatePage />}
 
       </AppShell>
     </>

@@ -17,9 +17,10 @@ import {
   Layers,
   List,
   Store,
+  Ruler,
 } from 'lucide-react';
 
-export type ActivePage = 'dashboard' | 'upload' | 'products' | 'locations' | 'analysis' | 'results' | 'vision' | 'guide' | 'series' | 'assortment' | 'allocations';
+export type ActivePage = 'dashboard' | 'upload' | 'products' | 'locations' | 'analysis' | 'results' | 'vision' | 'guide' | 'series' | 'assortment' | 'allocations' | 'size-templates';
 
 interface NavItem {
   id: ActivePage;
@@ -36,9 +37,10 @@ const NAV: NavItem[] = [
   { id: 'results',   icon: <ArrowLeftRight size={24} strokeWidth={1.7} />,  label: 'Results' },
   { id: 'vision',    icon: <ScanSearch size={24} strokeWidth={1.7} />,      label: 'Visual Search' },
   { id: 'guide',       icon: <BookOpen size={24} strokeWidth={1.7} />,       label: 'Strateji Rehberi' },
-  { id: 'series',      icon: <Layers size={24} strokeWidth={1.7} />,         label: 'Seriler' },
-  { id: 'assortment',  icon: <List size={24} strokeWidth={1.7} />,           label: 'Asorti Kuralları' },
-  { id: 'allocations', icon: <Store size={24} strokeWidth={1.7} />,          label: 'Tahsisatlar' },
+  { id: 'series',         icon: <Layers size={24} strokeWidth={1.7} />,  label: 'Seriler' },
+  { id: 'assortment',     icon: <List size={24} strokeWidth={1.7} />,   label: 'Asorti Kuralları' },
+  { id: 'allocations',    icon: <Store size={24} strokeWidth={1.7} />,  label: 'Tahsisatlar' },
+  { id: 'size-templates', icon: <Ruler size={24} strokeWidth={1.7} />,  label: 'Beden Aralıkları' },
 ];
 
 interface Props {

@@ -356,6 +356,18 @@ export async function bulkUpsertAllocations(items: Omit<StoreAllocation, 'id' | 
   return r.data.data;
 }
 
+export interface SizeTemplate {
+  year: number | null;
+  productName: string;
+  color: string;
+  sizes: string[];
+}
+
+export async function fetchSizeTemplates(): Promise<SizeTemplate[]> {
+  const r = await api.get<{ ok: boolean; data: SizeTemplate[] }>('/size-templates');
+  return r.data.data;
+}
+
 export async function applyAssortmentRules(): Promise<{ applied: number; skipped: number }> {
   const r = await api.post<{ ok: boolean; applied: number; skipped: number }>('/allocation/apply-rules');
   return { applied: r.data.applied, skipped: r.data.skipped };
