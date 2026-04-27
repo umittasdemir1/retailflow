@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { allocationStore } from '../store/allocationStore.js';
+import { sessionStore } from '../store/sessionStore.js';
 
 export const allocationRouter = Router();
 
@@ -118,4 +119,63 @@ allocationRouter.delete('/allocations/:id', (req, res) => {
   const ok = allocationStore.deleteAllocation(req.params.id);
   if (!ok) { res.status(404).json({ ok: false, error: 'Bulunamadı' }); return; }
   res.json({ ok: true });
+});
+
+// ── Apply assortment rules → auto-fill allocations ──────────────────────────
+
+allocationRouter.post('/apply-rules', (_req, res) => {
+  const state = sessionStore.get();
+  if (!state.data) {
+    res.status(400).json({ ok: false, error: 'Önce veri yükle' });
+    return;
+  }
+
+  // Build unique store × product × color set from inventory
+  const combos = new Map<string, { storeName: string; productName: string; color: string; category: string | null }>();
+  for (const r of state.data) {
+    const key = `${r.warehouseName}|||${r.productName}|||${r.color}`;
+    if (!combos.has(key)) {
+      combos.set(key, { storeName: r.warehouseName, productName: r.productName, color: r.color, category: r.category ?? null });
+    }
+  }
+
+  // Existing allocations lookup (skip ones that already have a series set)
+  const existingMap = new Map<string, import('@retailflow/shared').StoreAllocation>();
+  for (const a of allocationStore.getAllAllocations()) {
+    existingMap.set(`${a.storeName}|||${a.productName}|||${a.color}`, a);
+  }
+
+  const toUpsert: import('@retailflow/shared').StoreAllocation[] = [];
+  let applied = 0;
+  let skipped = 0;
+
+  for (const combo of combos.values()) {
+    const existing = existingMap.get(`${combo.storeName}|||${combo.productName}|||${combo.color}`);
+
+    // Already has a series manually set → skip
+    if (existing?.seriesId) { skipped++; continue; }
+
+    const resolved = allocationStore.resolveSeriesForProduct(combo.productName, combo.category);
+    if (!resolved) { skipped++; continue; }
+
+    toUpsert.push({
+      id:          existing?.id ?? '',
+      storeName:   combo.storeName,
+      productName: combo.productName,
+      color:       combo.color,
+      seriesId:    resolved.id,
+      seriesCount: existing?.seriesCount ?? 1,
+      enabled:     existing?.enabled     ?? true,
+      createdAt:   existing?.createdAt   ?? new Date().toISOString(),
+    });
+    applied++;
+  }
+
+  if (toUpsert.length > 0) {
+    allocationStore.bulkUpsertAllocations(
+      toUpsert.map(({ id: _id, createdAt: _c, ...rest }) => rest),
+    );
+  }
+
+  res.json({ ok: true, applied, skipped });
 });

@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef } from 'react';
-import { useSeries, useAllocations, useAllocationMutations, type StoreAllocation } from '../../hooks/useAllocation';
+import { useSeries, useAllocations, useAllocationMutations, useApplyRules, type StoreAllocation } from '../../hooks/useAllocation';
 import { useStores, useProducts } from '../../hooks/useStores';
-import { ChevronRight, ChevronDown, ToggleLeft, ToggleRight, ChevronsRight, Store } from 'lucide-react';
+import { ChevronRight, ChevronDown, ToggleLeft, ToggleRight, ChevronsRight, Store, Wand2 } from 'lucide-react';
 
 interface RowData {
   storeName: string;
@@ -18,45 +18,6 @@ function getState(row: RowData) {
   };
 }
 
-/* ── Bulk apply control on product header ─────────────────────────── */
-function BulkCell({ rows, series, onApply }: {
-  rows: RowData[];
-  series: { id: string; name: string }[];
-  onApply: (seriesId: string, count: number) => void;
-}) {
-  const [sid, setSid] = useState('');
-  const [cnt, setCnt] = useState(1);
-
-  return (
-    <div className="alc-bulk-cell" onClick={(e) => e.stopPropagation()}>
-      <select
-        className="rf-select alc-bulk-select"
-        value={sid}
-        onChange={(e) => setSid(e.target.value)}
-      >
-        <option value="">Tümüne seri uygula…</option>
-        {series.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-      </select>
-      <input
-        type="number" min={1} step={1} value={cnt}
-        onChange={(e) => setCnt(Math.max(1, Number(e.target.value)))}
-        className="alc-num-input"
-        style={{ width: 52 }}
-      />
-      <button
-        type="button"
-        className="rf-icon-btn"
-        title={`${rows.length} renge uygula`}
-        disabled={!sid}
-        onClick={() => { onApply(sid, cnt); setSid(''); setCnt(1); }}
-      >
-        <ChevronsRight size={14} />
-      </button>
-    </div>
-  );
-}
-
-/* ── Color row ────────────────────────────────────────────────────── */
 function ColorRow({ row, series, onSave }: {
   row: RowData;
   series: { id: string; name: string }[];
@@ -70,51 +31,131 @@ function ColorRow({ row, series, onSave }: {
   }
 
   return (
-    <tr className="alc-color-row">
-      <td className="alc-color-name">{row.color}</td>
-      <td>
-        <select
-          className="rf-select alc-inline-select"
-          value={state.seriesId}
-          onChange={(e) => save({ seriesId: e.target.value })}
-        >
-          <option value="">—</option>
-          {series.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-        </select>
-      </td>
-      <td className="alc-cell-center">
-        <input
-          type="number" min={1} step={1}
-          defaultValue={state.seriesCount}
-          key={row.allocation?.id ?? `${row.productName}${row.color}`}
-          onChange={(e) => {
-            clearTimeout(timerRef.current);
-            timerRef.current = setTimeout(() => save({ seriesCount: Math.max(1, Number(e.target.value)) }), 600);
-          }}
-          className="alc-num-input"
-          style={{ width: 60 }}
-        />
-      </td>
-      <td className="alc-cell-center">
-        <button
-          type="button"
-          className={`alc-toggle${state.enabled ? ' is-on' : ''}`}
-          onClick={() => save({ enabled: !state.enabled })}
-        >
-          {state.enabled ? <ToggleRight size={22} /> : <ToggleLeft size={22} />}
-        </button>
-      </td>
-    </tr>
+    <div className="alc-color-row">
+      <span className="alc-color-name">{row.color}</span>
+
+      <select
+        className="alc-inline-select"
+        value={state.seriesId}
+        onChange={(e) => save({ seriesId: e.target.value })}
+      >
+        <option value="">—</option>
+        {series.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+      </select>
+
+      <input
+        type="number"
+        min={1}
+        step={1}
+        defaultValue={state.seriesCount}
+        key={row.allocation?.id ?? `${row.productName}${row.color}`}
+        onChange={(e) => {
+          clearTimeout(timerRef.current);
+          timerRef.current = setTimeout(() => save({ seriesCount: Math.max(1, Number(e.target.value)) }), 600);
+        }}
+        className="alc-num-input"
+      />
+
+      <button
+        type="button"
+        className={`alc-toggle${state.enabled ? ' is-on' : ''}`}
+        onClick={() => save({ enabled: !state.enabled })}
+        title={state.enabled ? 'Devre dışı bırak' : 'Etkinleştir'}
+      >
+        {state.enabled ? <ToggleRight size={22} /> : <ToggleLeft size={22} />}
+      </button>
+    </div>
   );
 }
 
-/* ── Page ─────────────────────────────────────────────────────────── */
+function ProductGroup({ productName, colorRows, series, expanded, onToggle, onSave }: {
+  productName: string;
+  colorRows: RowData[];
+  series: { id: string; name: string }[];
+  expanded: boolean;
+  onToggle: () => void;
+  onSave: (row: RowData, patch: Partial<Omit<StoreAllocation, 'id' | 'createdAt'>>) => void;
+}) {
+  const [bulkSid, setBulkSid] = useState('');
+  const [bulkCnt, setBulkCnt] = useState(1);
+  const activeCount = colorRows.filter((r) => getState(r).enabled).length;
+
+  function applyBulk() {
+    if (!bulkSid) return;
+    colorRows.forEach((r) => onSave(r, { ...getState(r), seriesId: bulkSid, seriesCount: bulkCnt }));
+    setBulkSid('');
+    setBulkCnt(1);
+  }
+
+  return (
+    <div className="alc-group">
+      {/* Product header */}
+      <div className="alc-group-header">
+        <button type="button" className="alc-group-toggle" onClick={onToggle}>
+          {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+          <span className="alc-group-name">{productName}</span>
+          <span className="alc-group-meta">{colorRows.length} renk · {activeCount} aktif</span>
+        </button>
+
+        <div className="alc-bulk-area" onClick={(e) => e.stopPropagation()}>
+          <select
+            className="alc-inline-select"
+            value={bulkSid}
+            onChange={(e) => setBulkSid(e.target.value)}
+          >
+            <option value="">Tümüne seri uygula…</option>
+            {series.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+          <input
+            type="number"
+            min={1}
+            step={1}
+            value={bulkCnt}
+            onChange={(e) => setBulkCnt(Math.max(1, Number(e.target.value)))}
+            className="alc-num-input"
+          />
+          <button
+            type="button"
+            className="rf-icon-btn"
+            disabled={!bulkSid}
+            onClick={applyBulk}
+            title="Tümüne uygula"
+          >
+            <ChevronsRight size={14} />
+          </button>
+        </div>
+      </div>
+
+      {/* Color rows */}
+      {expanded && (
+        <div className="alc-color-list">
+          <div className="alc-color-list-header">
+            <span>Renk</span>
+            <span>Seri</span>
+            <span className="alc-col-center">Adet</span>
+            <span className="alc-col-center">Aktif</span>
+          </div>
+          {colorRows.map((row) => (
+            <ColorRow
+              key={row.color}
+              row={row}
+              series={series}
+              onSave={onSave}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function AllocationPage() {
   const { data: allocations = [], isLoading: allocLoading } = useAllocations();
   const { data: series = [] } = useSeries();
   const { data: stores = [] } = useStores();
   const { data: productsData } = useProducts();
   const { add, update } = useAllocationMutations();
+  const applyRules = useApplyRules();
 
   const [storeFilter, setStoreFilter] = useState('');
   const [productFilter, setProductFilter] = useState('');
@@ -146,8 +187,12 @@ export function AllocationPage() {
     return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
   }, [storeFilter, productFilter, onlyActive, products, allocMap]);
 
-  function toggle(name: string) {
-    setExpanded((prev) => { const n = new Set(prev); n.has(name) ? n.delete(name) : n.add(name); return n; });
+  function toggleGroup(name: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      next.has(name) ? next.delete(name) : next.add(name);
+      return next;
+    });
   }
 
   function saveRow(row: RowData, patch: Partial<Omit<StoreAllocation, 'id' | 'createdAt'>>) {
@@ -173,92 +218,63 @@ export function AllocationPage() {
               : 'Mağaza seçerek başla.'}
           </p>
         </div>
+        <button
+          type="button"
+          className="rf-secondary-button"
+          disabled={applyRules.isPending}
+          onClick={() => applyRules.mutate(undefined, {
+            onSuccess: (r) => alert(`Tamamlandı: ${r.applied} tahsisat güncellendi, ${r.skipped} atlandı.`),
+          })}
+          title="Asorti kurallarına göre seri ata (serisi boş olanlara)"
+        >
+          <Wand2 size={15} style={{ marginRight: 6 }} />
+          {applyRules.isPending ? 'Uygulanıyor…' : 'Kuralları Uygula'}
+        </button>
       </div>
 
-      {/* ── Toolbar ── */}
       <div className="alc-toolbar">
-        <select className="rf-select alc-store-select" value={storeFilter} onChange={(e) => setStoreFilter(e.target.value)}>
+        <select className="rf-select" style={{ flex: '0 0 220px' }} value={storeFilter} onChange={(e) => setStoreFilter(e.target.value)}>
           <option value="">Mağaza seç…</option>
           {storeNames.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
-        <div className="prd-search-wrap" style={{ flex: 1 }}>
-          <input
-            className="prd-search-input"
-            type="text"
-            placeholder="Model ara…"
-            value={productFilter}
-            onChange={(e) => setProductFilter(e.target.value)}
-          />
-        </div>
+        <input
+          type="text"
+          className="rf-text-input"
+          style={{ flex: 1 }}
+          placeholder="Model ara…"
+          value={productFilter}
+          onChange={(e) => setProductFilter(e.target.value)}
+        />
         <label className="alc-checkbox-label">
           <input type="checkbox" checked={onlyActive} onChange={(e) => setOnlyActive(e.target.checked)} />
           Sadece aktif
         </label>
       </div>
 
-      {!storeFilter
-        ? (
-          <div className="prd-empty" style={{ marginTop: 48 }}>
-            <Store size={40} strokeWidth={1.2} />
-            <p>Mağaza seçerek tahsisat tablosunu görüntüle.</p>
-          </div>
-        )
-        : (
-          <div className="prd-table-card">
-            <div className="rf-table-wrap" style={{ borderRadius: 0, border: 'none' }}>
-              <table className="rf-table alc-table">
-                <thead>
-                  <tr>
-                    <th>Model / Renk</th>
-                    <th style={{ width: 260 }}>Seri</th>
-                    <th style={{ width: 80, textAlign: 'center' }}>Adet</th>
-                    <th style={{ width: 72, textAlign: 'center' }}>Aktif</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {allocLoading && <tr><td colSpan={4} className="prd-loading-cell">Yükleniyor…</td></tr>}
-                  {!allocLoading && grouped.length === 0 && (
-                    <tr><td colSpan={4} style={{ padding: 0 }}>
-                      <div className="prd-empty"><p>Sonuç yok.</p></div>
-                    </td></tr>
-                  )}
-                  {grouped.map(([productName, colorRows]) => {
-                    const isOpen = expanded.has(productName);
-                    const activeCount = colorRows.filter((r) => getState(r).enabled).length;
-                    return (
-                      <>
-                        <tr key={productName} className="alc-product-row">
-                          <td className="alc-product-name" onClick={() => toggle(productName)}>
-                            {isOpen ? <ChevronDown size={14} className="alc-chevron" /> : <ChevronRight size={14} className="alc-chevron" />}
-                            <span>{productName}</span>
-                            <span className="alc-product-meta">{colorRows.length} renk · {activeCount} aktif</span>
-                          </td>
-                          <td colSpan={2}>
-                            <BulkCell
-                              rows={colorRows}
-                              series={series}
-                              onApply={(sid, cnt) => colorRows.forEach((r) => saveRow(r, { ...getState(r), seriesId: sid, seriesCount: cnt }))}
-                            />
-                          </td>
-                          <td />
-                        </tr>
-                        {isOpen && colorRows.map((row) => (
-                          <ColorRow
-                            key={`${row.productName}|||${row.color}`}
-                            row={row}
-                            series={series}
-                            onSave={saveRow}
-                          />
-                        ))}
-                      </>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )
-      }
+      {!storeFilter ? (
+        <div className="prd-empty" style={{ marginTop: 48 }}>
+          <Store size={40} strokeWidth={1.2} />
+          <p>Mağaza seçerek tahsisat tablosunu görüntüle.</p>
+        </div>
+      ) : allocLoading ? (
+        <p className="alc-loading">Yükleniyor…</p>
+      ) : grouped.length === 0 ? (
+        <div className="prd-empty" style={{ marginTop: 48 }}><p>Sonuç yok.</p></div>
+      ) : (
+        <div className="alc-group-list">
+          {grouped.map(([productName, colorRows]) => (
+            <ProductGroup
+              key={productName}
+              productName={productName}
+              colorRows={colorRows}
+              series={series}
+              expanded={expanded.has(productName)}
+              onToggle={() => toggleGroup(productName)}
+              onSave={saveRow}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

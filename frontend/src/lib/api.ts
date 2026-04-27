@@ -355,3 +355,8 @@ export async function bulkUpsertAllocations(items: Omit<StoreAllocation, 'id' | 
   const r = await api.post<{ ok: boolean; data: StoreAllocation[] }>('/allocation/allocations/bulk', { items });
   return r.data.data;
 }
+
+export async function applyAssortmentRules(): Promise<{ applied: number; skipped: number }> {
+  const r = await api.post<{ ok: boolean; applied: number; skipped: number }>('/allocation/apply-rules');
+  return { applied: r.data.applied, skipped: r.data.skipped };
+}

@@ -3,6 +3,7 @@ import {
   fetchSeries, createSeries, updateSeries, deleteSeries,
   fetchAssortmentRules, createAssortmentRule, deleteAssortmentRule,
   fetchAllocations, createAllocation, updateAllocation, deleteAllocation, bulkUpsertAllocations,
+  applyAssortmentRules,
 } from '../lib/api';
 import type { Series, AssortmentRule, StoreAllocation } from '../lib/api';
 
@@ -39,6 +40,14 @@ export function useAssortmentMutations() {
 
 export function useAllocations() {
   return useQuery({ queryKey: ['allocations'], queryFn: fetchAllocations });
+}
+
+export function useApplyRules() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: applyAssortmentRules,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['allocations'] }),
+  });
 }
 
 export function useAllocationMutations() {
